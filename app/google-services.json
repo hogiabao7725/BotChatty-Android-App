@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "794135545345",
+    "project_id": "botchatty-app-7725",
+    "storage_bucket": "botchatty-app-7725.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:794135545345:android:cb2725fc40ee4871ace200",
+        "android_client_info": {
+          "package_name": "com.hgb7725.botchattyapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVpAGitDE0XwbjjhJFALnrRV06AV9nSkM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

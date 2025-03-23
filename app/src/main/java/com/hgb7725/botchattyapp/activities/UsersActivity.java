@@ -1,20 +1,17 @@
 package com.hgb7725.botchattyapp.activities;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 
-import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
-import com.hgb7725.botchattyapp.R;
 import com.hgb7725.botchattyapp.adapters.UsersAdapter;
 import com.hgb7725.botchattyapp.databinding.ActivityUsersBinding;
-import com.hgb7725.botchattyapp.model.User;
+import com.hgb7725.botchattyapp.listeners.UserListener;
+import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
@@ -25,7 +22,7 @@ import java.util.List;
      * This activity extends AppCompatActivity to support backward compatibility
      * and provide modern UI features like Toolbar and Material Design.
      */
-public class UsersActivity extends AppCompatActivity {
+public class UsersActivity extends AppCompatActivity implements UserListener {
 
     private ActivityUsersBinding binding;
     private PreferenceManager preferenceManager;
@@ -63,10 +60,11 @@ public class UsersActivity extends AppCompatActivity {
                             user.setEmail(queryDocumentSnapshot.getString(Constants.KEY_EMAIL));
                             user.setImage(queryDocumentSnapshot.getString(Constants.KEY_IMAGE));
                             user.setToken(queryDocumentSnapshot.getString(Constants.KEY_FCM_TOKEN));
+                            user.setId(queryDocumentSnapshot.getId());
                             users.add(user);
                         }
                         if (users.size() > 0) {
-                            UsersAdapter usersAdapter = new UsersAdapter(users);
+                            UsersAdapter usersAdapter = new UsersAdapter(users, this);
                             // attach adapter to RecyclerView and display list of users
                             binding.usersRecyclerView.setAdapter(usersAdapter);
                             binding.usersRecyclerView.setVisibility(View.VISIBLE);
@@ -90,5 +88,13 @@ public class UsersActivity extends AppCompatActivity {
         } else {
             binding.progressBar.setVisibility(View.INVISIBLE);
         }
+    }
+
+    @Override
+    public void onUserClicked(User user) {
+        Intent intent = new Intent(getApplicationContext(), ChatActivity.class);
+        intent.putExtra(Constants.KEY_USER, user);
+        startActivity(intent);
+        finish();
     }
 }

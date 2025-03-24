@@ -36,7 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import com.hgb7725.botchattyapp.adapters.RencentConversationsAdapter;
 
-public class MainActivity extends AppCompatActivity implements ConversionListener {
+public class MainActivity extends BaseActivity implements ConversionListener {
 
     private ActivityMainBinding binding;
     private PreferenceManager preferenceManager;

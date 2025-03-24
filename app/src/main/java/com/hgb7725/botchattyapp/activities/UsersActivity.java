@@ -22,7 +22,7 @@ import java.util.List;
      * This activity extends AppCompatActivity to support backward compatibility
      * and provide modern UI features like Toolbar and Material Design.
      */
-public class UsersActivity extends AppCompatActivity implements UserListener {
+public class UsersActivity extends BaseActivity implements UserListener {
 
     private ActivityUsersBinding binding;
     private PreferenceManager preferenceManager;

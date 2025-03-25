@@ -12,4 +12,6 @@
     <color name="black">#000000</color>
     <color name="facebook">#4267B2</color>
     <color name="green">#008000</color>
+    <color name="offline_status">#FF0000</color>
+    <color name="online_status">#4CAF50</color>
 </resources>

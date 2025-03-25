@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.method.HideReturnsTransformationMethod;
+import android.text.method.PasswordTransformationMethod;
 import android.util.Base64;
 import android.util.Patterns;
 import android.view.View;
@@ -16,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.hgb7725.botchattyapp.R;
 import com.hgb7725.botchattyapp.databinding.ActivitySignUpBinding;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
@@ -30,6 +33,8 @@ public class SignUpActivity extends AppCompatActivity {
     private ActivitySignUpBinding binding;
     private PreferenceManager preferenceManager;
     private String encodedImage;
+    private boolean isPasswordVisible = false;
+    private boolean isConfirmPasswordVisible = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,6 +57,38 @@ public class SignUpActivity extends AppCompatActivity {
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             pickImage.launch(intent);
         });
+        binding.passwordToggle.setOnClickListener(v -> togglePasswordVisibility());
+        binding.confirmPasswordToggle.setOnClickListener(v -> toggleConfirmPasswordVisibility());
+    }
+
+    private void togglePasswordVisibility() {
+        isPasswordVisible = !isPasswordVisible;
+        if (isPasswordVisible) {
+            // Show password
+            binding.inputPassword.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
+            binding.passwordToggle.setImageResource(R.drawable.ic_visibility);
+        } else {
+            // Hide password
+            binding.inputPassword.setTransformationMethod(PasswordTransformationMethod.getInstance());
+            binding.passwordToggle.setImageResource(R.drawable.ic_visibility_off);
+        }
+        // Maintain cursor position
+        binding.inputPassword.setSelection(binding.inputPassword.getText().length());
+    }
+
+    private void toggleConfirmPasswordVisibility() {
+        isConfirmPasswordVisible = !isConfirmPasswordVisible;
+        if (isConfirmPasswordVisible) {
+            // Show confirm password
+            binding.inputConfirmPassword.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
+            binding.confirmPasswordToggle.setImageResource(R.drawable.ic_visibility);
+        } else {
+            // Hide confirm password
+            binding.inputConfirmPassword.setTransformationMethod(PasswordTransformationMethod.getInstance());
+            binding.confirmPasswordToggle.setImageResource(R.drawable.ic_visibility_off);
+        }
+        // Maintain cursor position
+        binding.inputConfirmPassword.setSelection(binding.inputConfirmPassword.getText().length());
     }
 
     private void showToast(String message) {

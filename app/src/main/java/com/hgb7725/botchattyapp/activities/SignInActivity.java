@@ -2,6 +2,8 @@ package com.hgb7725.botchattyapp.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.method.HideReturnsTransformationMethod;
+import android.text.method.PasswordTransformationMethod;
 import android.util.Patterns;
 import android.view.View;
 import android.widget.Toast;
@@ -10,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.hgb7725.botchattyapp.R;
 import com.hgb7725.botchattyapp.databinding.ActivitySignInBinding;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
@@ -18,6 +21,7 @@ public class SignInActivity extends AppCompatActivity {
 
     private ActivitySignInBinding binding;
     private PreferenceManager preferenceManager;
+    private boolean isPasswordVisible = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +49,32 @@ public class SignInActivity extends AppCompatActivity {
                 signIn();
             }
         });
+        binding.passwordToggle.setOnClickListener(v -> togglePasswordVisibility());
+        
+        // Temporary listeners for social login and forgot password
+        binding.buttonGoogleLogin.setOnClickListener(v -> 
+            showToast("Google Sign In coming soon!"));
+        
+        binding.buttonFacebookLogin.setOnClickListener(v -> 
+            showToast("Facebook Sign In coming soon!"));
+        
+        binding.textForgotPassword.setOnClickListener(v -> 
+            showToast("Password Recovery coming soon!"));
+    }
+
+    private void togglePasswordVisibility() {
+        isPasswordVisible = !isPasswordVisible;
+        if (isPasswordVisible) {
+            // Show password
+            binding.inputPassword.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
+            binding.passwordToggle.setImageResource(R.drawable.ic_visibility);
+        } else {
+            // Hide password
+            binding.inputPassword.setTransformationMethod(PasswordTransformationMethod.getInstance());
+            binding.passwordToggle.setImageResource(R.drawable.ic_visibility_off);
+        }
+        // Maintain cursor position
+        binding.inputPassword.setSelection(binding.inputPassword.getText().length());
     }
 
     private void signIn() {

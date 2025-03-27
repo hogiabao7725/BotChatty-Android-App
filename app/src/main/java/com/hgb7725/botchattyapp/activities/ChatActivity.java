@@ -1,11 +1,15 @@
 package com.hgb7725.botchattyapp.activities;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -49,6 +53,9 @@ public class ChatActivity extends BaseActivity {
     private FirebaseFirestore database;
     private String conversionId = null;
     private Boolean isReceiverAvailable = false;
+    private static final int PICK_IMAGE_REQUEST = 1;
+    private static final int PICK_FILE_REQUEST = 2;
+    private static final int RECORD_AUDIO_REQUEST = 3;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -181,6 +188,64 @@ public class ChatActivity extends BaseActivity {
     private void setListeners() {
         binding.imageBack.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         binding.layoutSend.setOnClickListener(v -> sendMessage());
+        
+        // Add attachment button click listener
+        binding.imageAttachment.setOnClickListener(v -> toggleAttachmentOptions());
+        
+        // Add attachment options click listeners
+        binding.layoutAttachmentOptions.layoutImage.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+            startActivityForResult(intent, PICK_IMAGE_REQUEST);
+            toggleAttachmentOptions();
+        });
+        
+        binding.layoutAttachmentOptions.layoutDocument.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("*/*");
+            startActivityForResult(intent, PICK_FILE_REQUEST);
+            toggleAttachmentOptions();
+        });
+        
+        binding.layoutAttachmentOptions.layoutAudio.setOnClickListener(v -> {
+            // Implement audio recording logic here
+            Toast.makeText(this, "Audio recording coming soon!", Toast.LENGTH_SHORT).show();
+            toggleAttachmentOptions();
+        });
+    }
+
+    private void toggleAttachmentOptions() {
+        if (binding.layoutAttachmentOptions.getRoot().getVisibility() == View.VISIBLE) {
+            binding.layoutAttachmentOptions.getRoot().setVisibility(View.GONE);
+        } else {
+            binding.layoutAttachmentOptions.getRoot().setVisibility(View.VISIBLE);
+        }
+    }
+
+    // Processes the selected media (file and image) based on the request code.
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == RESULT_OK) {
+            if (requestCode == PICK_IMAGE_REQUEST && data != null) {
+                Uri imageUri = data.getData();
+                // Handle image upload
+                handleImageUpload(imageUri);
+            } else if (requestCode == PICK_FILE_REQUEST && data != null) {
+                Uri fileUri = data.getData();
+                // Handle file upload
+                handleFileUpload(fileUri);
+            }
+        }
+    }
+
+    private void handleImageUpload(Uri imageUri) {
+        // Implement image upload logic here
+        Toast.makeText(this, "Image upload coming soon!", Toast.LENGTH_SHORT).show();
+    }
+
+    private void handleFileUpload(Uri fileUri) {
+        // Implement file upload logic here
+        Toast.makeText(this, "File upload coming soon!", Toast.LENGTH_SHORT).show();
     }
 
     private String getReadableDateTime(Date date) {

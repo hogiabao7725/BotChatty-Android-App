@@ -13,6 +13,8 @@ public class ChatMessage {
     private String conversionName;
     private String conversionImage;
 
+    private String type = "text";
+
     public ChatMessage() {};
 
     public String getConversionId() {
@@ -77,5 +79,13 @@ public class ChatMessage {
 
     public void setDateTime(String dateTime) {
         this.dateTime = dateTime;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 }

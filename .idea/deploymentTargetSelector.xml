@@ -4,7 +4,7 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-03-25T18:09:27.575894800Z">
+        <DropdownSelection timestamp="2025-04-07T15:09:39.846069700Z">
           <Target type="DEFAULT_BOOT">
             <handle>
               <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\hogia\.android\avd\Pixel_9_Pro_2.avd" />

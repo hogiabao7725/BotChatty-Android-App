@@ -14,6 +14,7 @@ public class ChatMessage {
     private String conversionImage;
 
     private String type = "text";
+    private String fileName;
 
     public ChatMessage() {};
 
@@ -87,5 +88,13 @@ public class ChatMessage {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
     }
 }

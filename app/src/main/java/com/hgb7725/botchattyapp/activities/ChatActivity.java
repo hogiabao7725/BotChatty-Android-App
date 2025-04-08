@@ -29,6 +29,7 @@ import com.hgb7725.botchattyapp.models.ChatMessage;
 import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.CloudinaryConfig;
 import com.hgb7725.botchattyapp.utilities.Constants;
+import com.hgb7725.botchattyapp.utilities.FileUtils;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
 import org.json.JSONException;
@@ -160,6 +161,8 @@ public class ChatActivity extends BaseActivity {
                     String type = documentChange.getDocument().getString("type");
                     chatMessage.setType(type != null ? type : "text");
 
+                    chatMessage.setFileName(documentChange.getDocument().getString("fileName"));
+
                     chatMessage.setDateTime(getReadableDateTime(documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP)));
                     chatMessage.setDateObject(documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP));
                     chatMessages.add(chatMessage);
@@ -195,24 +198,24 @@ public class ChatActivity extends BaseActivity {
     private void setListeners() {
         binding.imageBack.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         binding.layoutSend.setOnClickListener(v -> sendMessage());
-        
+
         // Add attachment button click listener
         binding.imageAttachment.setOnClickListener(v -> toggleAttachmentOptions());
-        
+
         // Add attachment options click listeners
         binding.layoutAttachmentOptions.layoutImage.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
             startActivityForResult(intent, PICK_IMAGE_REQUEST);
             toggleAttachmentOptions();
         });
-        
+
         binding.layoutAttachmentOptions.layoutDocument.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
             intent.setType("*/*");
             startActivityForResult(intent, PICK_FILE_REQUEST);
             toggleAttachmentOptions();
         });
-        
+
         binding.layoutAttachmentOptions.layoutAudio.setOnClickListener(v -> {
             // Implement audio recording logic here
             Toast.makeText(this, "Audio recording coming soon!", Toast.LENGTH_SHORT).show();
@@ -252,8 +255,55 @@ public class ChatActivity extends BaseActivity {
     }
 
     private void handleFileUpload(Uri fileUri) {
-        // Implement file upload logic here
-        Toast.makeText(this, "File upload coming soon!", Toast.LENGTH_SHORT).show();
+        try {
+            InputStream inputStream = getContentResolver().openInputStream(fileUri);
+            byte[] fileBytes = new byte[inputStream.available()];
+            inputStream.read(fileBytes);
+            String base64File = Base64.encodeToString(fileBytes, Base64.NO_WRAP);
+
+            String originalFileName = FileUtils.getFileNameFromUri(this, fileUri);
+            String fileName = originalFileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+            RequestQueue requestQueue = Volley.newRequestQueue(this);
+            String uploadUrl = CloudinaryConfig.getUploadUrl("raw");
+
+            JSONObject params = new JSONObject();
+            params.put("file", "data:application/octet-stream;base64," + base64File);
+            params.put("upload_preset", CloudinaryConfig.PRESET_FILE);
+            params.put("public_id", fileName);
+
+            Log.d("CLOUDINARY_DEBUG", "Preset: " + CloudinaryConfig.PRESET_FILE);
+            Log.d("CLOUDINARY_DEBUG", "Upload URL: " + uploadUrl);
+            Log.d("CLOUDINARY_DEBUG", "Base64 Length: " + base64File.length());
+            Log.d("CLOUDINARY_DEBUG", "Preset: " + CloudinaryConfig.PRESET_FILE);
+
+            Toast.makeText(this, "Uploading: " + CloudinaryConfig.PRESET_FILE, Toast.LENGTH_SHORT).show();
+
+            JsonObjectRequest request = new JsonObjectRequest(Request.Method.POST, uploadUrl, params,
+                    response -> {
+                        try {
+                            String fileUrl = response.getString("secure_url");
+                            sendFileMessage(fileUrl, fileName);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    },
+                    error -> {
+                        String errorMsg = "Unknown error";
+                        if (error.networkResponse != null && error.networkResponse.data != null) {
+                            errorMsg = new String(error.networkResponse.data);
+                        } else if (error.getMessage() != null) {
+                            errorMsg = error.getMessage();
+                        }
+                        Log.e("FILE_UPLOAD", "Upload failed: " + errorMsg);
+                        Toast.makeText(this, "Upload failed:\n" + errorMsg, Toast.LENGTH_LONG).show();
+                    }
+            );
+            requestQueue.add(request);
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Upload error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private String getReadableDateTime(Date date) {
@@ -377,6 +427,77 @@ public class ChatActivity extends BaseActivity {
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "Upload error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void uploadFileToCloudinary(Uri fileUri, String fileName) {
+        try {
+            InputStream inputStream = getContentResolver().openInputStream(fileUri);
+            byte[] fileBytes = new byte[inputStream.available()];
+            inputStream.read(fileBytes);
+            String base64File = Base64.encodeToString(fileBytes, Base64.NO_WRAP);
+
+            RequestQueue requestQueue = Volley.newRequestQueue(this);
+            String uploadUrl = CloudinaryConfig.getUploadUrl("raw");
+
+            JSONObject params = new JSONObject();
+            params.put("file", "data:application/octet-stream;base64," + base64File);
+            params.put("upload_preset", CloudinaryConfig.PRESET_FILE);
+            params.put("public_id", fileName);
+
+            JsonObjectRequest request = new JsonObjectRequest(Request.Method.POST, uploadUrl, params,
+                    response -> {
+                        try {
+                            String fileUrl = response.getString("secure_url");
+                            sendFileMessage(fileUrl, fileName);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    },
+                    error -> {
+                        String errorMsg = "Unknown error";
+                        if (error.networkResponse != null && error.networkResponse.data != null) {
+                            errorMsg = new String(error.networkResponse.data);
+                        } else if (error.getMessage() != null) {
+                            errorMsg = error.getMessage();
+                        }
+                        Log.e("UPLOAD_FILE", "Upload failed: " + errorMsg, error);
+                        Toast.makeText(this, "Upload failed:\n" + errorMsg, Toast.LENGTH_LONG).show();
+                    }
+            );
+
+            requestQueue.add(request);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Upload error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void sendFileMessage(String fileUrl, String fileName) {
+        HashMap<String, Object> message = new HashMap<>();
+        message.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+        message.put(Constants.KEY_RECEIVER_ID, receiverUser.getId());
+        message.put(Constants.KEY_MESSAGE, fileUrl); // URL file
+        message.put("fileName", fileName);           // Tên file
+        message.put("type", "file");                 // Phân biệt là file
+        message.put(Constants.KEY_TIMESTAMP, new Date());
+
+        database.collection(Constants.KEY_COLLECTION_CHAT).add(message);
+
+        if (conversionId != null) {
+            updateConversion("File: " + fileName);
+        } else {
+            HashMap<String, Object> conversion = new HashMap<>();
+            conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+            conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
+            conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
+            conversion.put(Constants.KEY_RECEIVER_ID, receiverUser.getId());
+            conversion.put(Constants.KEY_RECEIVER_NAME, receiverUser.getName());
+            conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverUser.getImage());
+            conversion.put(Constants.KEY_LAST_MESSAGE, "File: " + fileName);
+            conversion.put(Constants.KEY_TIMESTAMP, new Date());
+            addConversion(conversion);
         }
     }
 

@@ -268,14 +268,13 @@ public class ChatActivity extends BaseActivity {
             String uploadUrl = CloudinaryConfig.getUploadUrl("raw");
 
             JSONObject params = new JSONObject();
-            params.put("file", "data:application/octet-stream;base64," + base64File);
+            String mimeType = getContentResolver().getType(fileUri);
+            if (mimeType == null) {
+                mimeType = "application/octet-stream"; // fallback for unknown
+            }
+            params.put("file", "data:" + mimeType + ";base64," + base64File);
             params.put("upload_preset", CloudinaryConfig.PRESET_FILE);
             params.put("public_id", fileName);
-
-            Log.d("CLOUDINARY_DEBUG", "Preset: " + CloudinaryConfig.PRESET_FILE);
-            Log.d("CLOUDINARY_DEBUG", "Upload URL: " + uploadUrl);
-            Log.d("CLOUDINARY_DEBUG", "Base64 Length: " + base64File.length());
-            Log.d("CLOUDINARY_DEBUG", "Preset: " + CloudinaryConfig.PRESET_FILE);
 
             Toast.makeText(this, "Uploading: " + CloudinaryConfig.PRESET_FILE, Toast.LENGTH_SHORT).show();
 

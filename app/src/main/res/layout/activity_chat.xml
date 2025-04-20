@@ -76,7 +76,7 @@
         android:background="@color/primary"
         android:layout_marginTop="@dimen/_12sdp"
         app:layout_constraintTop_toBottomOf="@id/imageBack" />
-    
+
     <TextView
         android:id="@+id/textAvailability"
         android:layout_width="match_parent"
@@ -88,7 +88,8 @@
         android:text="@string/online"
         android:gravity="center"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/viewSupporter"/>
+        app:layout_constraintTop_toBottomOf="@id/viewSupporter"
+        android:translationZ="10dp"/>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/chatRecyclerView"
@@ -150,11 +151,31 @@
         android:importantForAutofill="no"
         android:inputType="text"
         android:paddingStart="@dimen/_16sdp"
-        android:paddingEnd="@dimen/_16sdp"
+        android:paddingEnd="@dimen/_40sdp"
         android:textColor="@color/white"
         android:textColorHint="@color/secondary_text"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/layoutSend"
         app:layout_constraintStart_toStartOf="parent"/>
+
+    <ImageView
+        android:id="@+id/imageAttachment"
+        android:layout_width="@dimen/_24sdp"
+        android:layout_height="@dimen/_24sdp"
+        android:layout_marginEnd="@dimen/_8sdp"
+        android:src="@drawable/ic_add"
+        app:tint="@color/white"
+        app:layout_constraintEnd_toEndOf="@id/inputMessage"
+        app:layout_constraintTop_toTopOf="@id/inputMessage"
+        app:layout_constraintBottom_toBottomOf="@id/inputMessage"/>
+
+    <include
+        android:id="@+id/layoutAttachmentOptions"
+        layout="@layout/layout_attachment_options"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/inputMessage"
+        app:layout_constraintEnd_toEndOf="@id/inputMessage"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

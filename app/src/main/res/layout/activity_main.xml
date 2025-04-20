@@ -65,11 +65,13 @@
             android:id="@+id/conversationsRecyclerView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="@dimen/_20sdp"
+            android:paddingTop="@dimen/_20sdp"
+            android:paddingBottom="@dimen/_20sdp"
+            android:paddingLeft="@dimen/_10sdp"
+            android:paddingRight="@dimen/_10sdp"
             android:clipToPadding="false"
             android:orientation="vertical"
             android:overScrollMode="never"
-            android:paddingBottom="@dimen/_20sdp"
             android:visibility="gone"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"/>
 

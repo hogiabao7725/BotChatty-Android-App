@@ -17,3 +17,5 @@ local.properties
 # Ignore log files
 hs_err_pid*.log
 replay_pid*.log
+
+app/src/main/assets/service-account.json

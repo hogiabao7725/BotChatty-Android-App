@@ -57,9 +57,10 @@ public class SignInActivity extends AppCompatActivity {
         
         binding.buttonFacebookLogin.setOnClickListener(v -> 
             showToast("Facebook Sign In coming soon!"));
-        
-        binding.textForgotPassword.setOnClickListener(v -> 
-            showToast("Password Recovery coming soon!"));
+
+        binding.textForgotPassword.setOnClickListener(v ->
+                startActivity(new Intent(getApplicationContext(), ForgotPasswordActivity.class))
+        );
     }
 
     private void togglePasswordVisibility() {

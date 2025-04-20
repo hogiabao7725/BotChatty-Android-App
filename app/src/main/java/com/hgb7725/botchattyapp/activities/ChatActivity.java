@@ -477,9 +477,9 @@ public class ChatActivity extends BaseActivity {
         HashMap<String, Object> message = new HashMap<>();
         message.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
         message.put(Constants.KEY_RECEIVER_ID, receiverUser.getId());
-        message.put(Constants.KEY_MESSAGE, fileUrl); // URL file
-        message.put("fileName", fileName);           // Tên file
-        message.put("type", "file");                 // Phân biệt là file
+        message.put(Constants.KEY_MESSAGE, fileUrl);
+        message.put("fileName", fileName);
+        message.put("type", "file");
         message.put(Constants.KEY_TIMESTAMP, new Date());
 
         database.collection(Constants.KEY_COLLECTION_CHAT).add(message);

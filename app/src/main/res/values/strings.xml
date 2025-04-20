@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">BotChatty</string>
-    
+
     <!-- Sign In Screen -->
     <string name="login">Login</string>
     <string name="welcome_back">Welcome back!</string>
@@ -25,4 +25,12 @@
     <string name="sign_in">Sign in</string>
     <string name="online">Online</string>
     <string name="select_user">Select User</string>
+
+    <string name="send_otp_code">Send OTP Code</string>
+    <string name="back">Back</string>
+    <string name="verify">Verify</string>
+    <string name="didnt_receive_code">Didn\'t receive the code? </string>
+    <string name="resend">Resend</string>
+    <string name="code_expires_in">Code expires in: </string>
+    <string name="empty_number">-</string>
 </resources>

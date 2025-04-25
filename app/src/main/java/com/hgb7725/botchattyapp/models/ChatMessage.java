@@ -15,6 +15,8 @@ public class ChatMessage {
 
     private String type = "text";
     private String fileName;
+    private int unreadCount = 0; // Thêm trường mới để đếm số tin nhắn chưa đọc
+    private String lastSenderId; // ID của người gửi tin nhắn cuối cùng
 
     public ChatMessage() {};
 
@@ -96,5 +98,21 @@ public class ChatMessage {
 
     public void setFileName(String fileName) {
         this.fileName = fileName;
+    }
+
+    public int getUnreadCount() {
+        return unreadCount;
+    }
+
+    public void setUnreadCount(int unreadCount) {
+        this.unreadCount = unreadCount;
+    }
+
+    public String getLastSenderId() {
+        return lastSenderId;
+    }
+
+    public void setLastSenderId(String lastSenderId) {
+        this.lastSenderId = lastSenderId;
     }
 }

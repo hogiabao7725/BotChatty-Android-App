@@ -3,6 +3,7 @@ package com.hgb7725.botchattyapp.adapters;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -69,6 +70,14 @@ public class RencentConversationsAdapter extends RecyclerView.Adapter<RencentCon
             binding.textName.setText(chatMessage.getConversionName());
             binding.textRecentMessage.setText(chatMessage.getMessage());
             binding.textDateTime.setText(getReadableDateTime(chatMessage.getDateObject()));
+            
+            // Hiển thị số tin nhắn chưa đọc nếu có
+            if (chatMessage.getUnreadCount() > 0) {
+                binding.textUnreadCount.setVisibility(View.VISIBLE);
+                binding.textUnreadCount.setText(String.valueOf(chatMessage.getUnreadCount()));
+            } else {
+                binding.textUnreadCount.setVisibility(View.GONE);
+            }
             
             binding.getRoot().setOnClickListener(v -> {
                 User user = new User();

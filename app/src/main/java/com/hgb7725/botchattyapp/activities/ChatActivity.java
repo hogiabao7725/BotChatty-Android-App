@@ -70,6 +70,9 @@ public class ChatActivity extends BaseActivity {
         loadReceiverDetails();
         init();
         listenMessages();
+        
+        // Đánh dấu cuộc trò chuyện hiện tại là đã đọc
+        markConversationAsRead();
     }
 
     private void init() {
@@ -90,6 +93,7 @@ public class ChatActivity extends BaseActivity {
         message.put(Constants.KEY_RECEIVER_ID, receiverUser.getId());
         message.put(Constants.KEY_MESSAGE, binding.inputMessage.getText().toString());
         message.put(Constants.KEY_TIMESTAMP, new Date());
+        message.put("type", "text");
         database.collection(Constants.KEY_COLLECTION_CHAT).add(message);
 
         if(conversionId != null) {
@@ -104,6 +108,8 @@ public class ChatActivity extends BaseActivity {
             conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverUser.getImage());
             conversion.put(Constants.KEY_LAST_MESSAGE, binding.inputMessage.getText().toString());
             conversion.put(Constants.KEY_TIMESTAMP, new Date());
+            conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
+            conversion.put("unreadCount", 1);
             addConversion(conversion);
         }
 
@@ -312,18 +318,57 @@ public class ChatActivity extends BaseActivity {
     }
 
     private void addConversion(HashMap<String, Object> conversion) {
+        // Kiểm tra conversation theo cả 2 chiều (sender -> receiver và receiver -> sender)
         database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                .add(conversion)
-                .addOnSuccessListener(documentReference -> conversionId = documentReference.getId());
+                .whereEqualTo(Constants.KEY_SENDER_ID, conversion.get(Constants.KEY_SENDER_ID))
+                .whereEqualTo(Constants.KEY_RECEIVER_ID, conversion.get(Constants.KEY_RECEIVER_ID))
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
+                        // Nếu tìm thấy conversation theo chiều sender -> receiver
+                        DocumentReference documentReference = task.getResult().getDocuments().get(0).getReference();
+                        conversionId = documentReference.getId();
+                        documentReference.update(conversion);
+                    } else {
+                        // Nếu không tìm thấy theo chiều đầu tiên, kiểm tra chiều ngược lại
+                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                                .whereEqualTo(Constants.KEY_SENDER_ID, conversion.get(Constants.KEY_RECEIVER_ID))
+                                .whereEqualTo(Constants.KEY_RECEIVER_ID, conversion.get(Constants.KEY_SENDER_ID))
+                                .get()
+                                .addOnCompleteListener(reverseTask -> {
+                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && !reverseTask.getResult().isEmpty()) {
+                                        // Nếu tìm thấy conversation theo chiều receiver -> sender
+                                        DocumentReference reverseDocRef = reverseTask.getResult().getDocuments().get(0).getReference();
+                                        conversionId = reverseDocRef.getId();
+                                        reverseDocRef.update(conversion);
+                                    } else {
+                                        // Nếu không tìm thấy conversation theo cả 2 chiều, tạo mới
+                                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                                                .add(conversion)
+                                                .addOnSuccessListener(documentReference -> conversionId = documentReference.getId());
+                                    }
+                                });
+                    }
+                });
     }
 
     private void updateConversion(String message) {
         DocumentReference documentReference =
                 database.collection(Constants.KEY_COLLECTION_CONVERSATIONS).document(conversionId);
-        documentReference.update(
-                Constants.KEY_LAST_MESSAGE, message,
-                Constants.KEY_TIMESTAMP, new Date()
-        );
+
+        HashMap<String, Object> updates = new HashMap<>();
+        updates.put(Constants.KEY_LAST_MESSAGE, message);
+        updates.put(Constants.KEY_TIMESTAMP, new Date());
+        updates.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+        updates.put(Constants.KEY_RECEIVER_ID, receiverUser.getId());
+        updates.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
+        updates.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
+        updates.put(Constants.KEY_RECEIVER_NAME, receiverUser.getName());
+        updates.put(Constants.KEY_RECEIVER_IMAGE, receiverUser.getImage());
+        updates.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
+        updates.put("unreadCount", com.google.firebase.firestore.FieldValue.increment(1));
+        
+        documentReference.update(updates);
     }
 
     private void checkForConversion() {
@@ -340,50 +385,98 @@ public class ChatActivity extends BaseActivity {
     }
 
     private void checkForConversionRemotely(String senderId, String receiverId) {
+        // Kiểm tra cả 2 chiều của conversation
         database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
                 .whereEqualTo(Constants.KEY_SENDER_ID, senderId)
                 .whereEqualTo(Constants.KEY_RECEIVER_ID, receiverId)
                 .get()
-                .addOnCompleteListener(conversionOnCompleteListener);
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && task.getResult().getDocuments().size() > 0) {
+                        DocumentSnapshot documentSnapshot = task.getResult().getDocuments().get(0);
+                        conversionId = documentSnapshot.getId();
+                    } else {
+                        // Nếu không tìm thấy theo chiều thứ nhất, kiểm tra chiều ngược lại
+                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                                .whereEqualTo(Constants.KEY_SENDER_ID, receiverId)
+                                .whereEqualTo(Constants.KEY_RECEIVER_ID, senderId)
+                                .get()
+                                .addOnCompleteListener(reverseTask -> {
+                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && reverseTask.getResult().getDocuments().size() > 0) {
+                                        DocumentSnapshot reverseDocSnapshot = reverseTask.getResult().getDocuments().get(0);
+                                        conversionId = reverseDocSnapshot.getId();
+                                    }
+                                });
+                    }
+                });
     }
 
-    // determine conversionId if conversation already exists, 2-way
     private final OnCompleteListener<QuerySnapshot> conversionOnCompleteListener = task -> {
-      if(task.isSuccessful() && task.getResult() != null && task.getResult().getDocuments().size() > 0) {
-          DocumentSnapshot documentSnapshot = task.getResult().getDocuments().get(0);
-          conversionId = documentSnapshot.getId();
-      }
+        if (task.isSuccessful() && task.getResult() != null && task.getResult().getDocuments().size() > 0) {
+            DocumentSnapshot documentSnapshot = task.getResult().getDocuments().get(0);
+            conversionId = documentSnapshot.getId();
+        }
     };
 
     @Override
     protected void onResume() {
         super.onResume();
         listenAvailabilityOfReceiver();
+        
+        // Đánh dấu người dùng đang ở trong cuộc trò chuyện với người nhận
+        // Lưu id người nhận vào preferences để MainActivity biết
+        preferenceManager.putString("current_chat_user_id", receiverUser.getId());
+        
+        // Đánh dấu cuộc trò chuyện là đã đọc mỗi khi resume
+        markConversationAsRead();
+    }
+    
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Khi rời khỏi màn hình chat, xóa id người nhận khỏi preferences
+        preferenceManager.putString("current_chat_user_id", null);
+    }
+    
+    // Phương thức đánh dấu cuộc trò chuyện là đã đọc
+    private void markConversationAsRead() {
+        // Tìm cuộc trò chuyện trong Firestore và đặt unreadCount về 0
+        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                .whereEqualTo(Constants.KEY_SENDER_ID, receiverUser.getId())
+                .whereEqualTo(Constants.KEY_RECEIVER_ID, preferenceManager.getString(Constants.KEY_USER_ID))
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
+                        // Cập nhật unreadCount về 0 trong Firestore
+                        DocumentReference documentReference = task.getResult().getDocuments().get(0).getReference();
+                        documentReference.update("unreadCount", 0);
+                    }
+                });
     }
 
     private void sendImageMessage(String imageUrl) {
         HashMap<String, Object> message = new HashMap<>();
         message.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
         message.put(Constants.KEY_RECEIVER_ID, receiverUser.getId());
-        message.put(Constants.KEY_MESSAGE, imageUrl); // Lưu URL ảnh thay vì text
+        message.put(Constants.KEY_MESSAGE, imageUrl);
         message.put(Constants.KEY_TIMESTAMP, new Date());
-        message.put("type", "image"); // Thêm type để phân biệt text/image
-        database.collection(Constants.KEY_COLLECTION_CHAT).add(message);
+        message.put("type", "image");
 
-        if(conversionId != null) {
-            updateConversion("Image");
-        } else {
-            HashMap<String, Object> conversion = new HashMap<>();
-            conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
-            conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
-            conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
-            conversion.put(Constants.KEY_RECEIVER_ID, receiverUser.getId());
-            conversion.put(Constants.KEY_RECEIVER_NAME, receiverUser.getName());
-            conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverUser.getImage());
-            conversion.put(Constants.KEY_LAST_MESSAGE, "Image");
-            conversion.put(Constants.KEY_TIMESTAMP, new Date());
-            addConversion(conversion);
-        }
+        database.collection(Constants.KEY_COLLECTION_CHAT).add(message)
+            .addOnSuccessListener(documentReference -> {
+                HashMap<String, Object> conversion = new HashMap<>();
+                conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+                conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
+                conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
+                conversion.put(Constants.KEY_RECEIVER_ID, receiverUser.getId());
+                conversion.put(Constants.KEY_RECEIVER_NAME, receiverUser.getName());
+                conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverUser.getImage());
+                conversion.put(Constants.KEY_LAST_MESSAGE, "Image");
+                conversion.put(Constants.KEY_TIMESTAMP, new Date());
+                conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
+                conversion.put("unreadCount", com.google.firebase.firestore.FieldValue.increment(1));
+                // Bao gồm cả trường hợp conversation đã tồn tại hoặc chưa
+                addConversion(conversion);
+            });
     }
 
     private void uploadImageToCloudinary(Uri imageUri) {
@@ -404,7 +497,7 @@ public class ChatActivity extends BaseActivity {
                     response -> {
                         try {
                             String imageUrl = response.getString("secure_url");
-                            sendImageMessage(imageUrl); // Gửi tin nhắn chứa ảnh
+                            sendImageMessage(imageUrl);
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
@@ -496,6 +589,8 @@ public class ChatActivity extends BaseActivity {
             conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverUser.getImage());
             conversion.put(Constants.KEY_LAST_MESSAGE, "File: " + fileName);
             conversion.put(Constants.KEY_TIMESTAMP, new Date());
+            conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
+            conversion.put("unreadCount", 1);
             addConversion(conversion);
         }
     }

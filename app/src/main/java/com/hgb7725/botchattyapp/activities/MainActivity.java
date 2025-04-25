@@ -32,6 +32,7 @@ import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import com.hgb7725.botchattyapp.adapters.RencentConversationsAdapter;
@@ -96,34 +97,76 @@ public class MainActivity extends BaseActivity implements ConversionListener {
         }
         if (value != null) {
             for (DocumentChange documentChange : value.getDocumentChanges()) {
-                ChatMessage chatMessage = null;
                 if (documentChange.getType() == DocumentChange.Type.ADDED) {
                     String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
                     String receiverId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
-                    chatMessage = new ChatMessage();
-                    chatMessage.setSenderId(senderId);
-                    chatMessage.setReceiverId(receiverId);
-
-                    if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
-                        chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_RECEIVER_IMAGE));
-                        chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_RECEIVER_NAME));
-                        chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID));
-                    } else {
-                        chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_SENDER_IMAGE));
-                        chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_SENDER_NAME));
-                        chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_SENDER_ID));
+                    
+                    // Kiểm tra xem conversation đã tồn tại trong danh sách chưa
+                    boolean conversationExists = false;
+                    for (ChatMessage existingChat : conversations) {
+                        if ((existingChat.getSenderId().equals(senderId) && existingChat.getReceiverId().equals(receiverId)) ||
+                            (existingChat.getSenderId().equals(receiverId) && existingChat.getReceiverId().equals(senderId))) {
+                            conversationExists = true;
+                            break;
+                        }
                     }
+                    
+                    if (!conversationExists) {
+                        ChatMessage chatMessage = new ChatMessage();
+                        chatMessage.setSenderId(senderId);
+                        chatMessage.setReceiverId(receiverId);
 
-                    chatMessage.setMessage(documentChange.getDocument().getString(Constants.KEY_LAST_MESSAGE));
-                    chatMessage.setDateObject(documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP));
-                    conversations.add(chatMessage);
+                        if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
+                            chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_RECEIVER_IMAGE));
+                            chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_RECEIVER_NAME));
+                            chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID));
+                        } else {
+                            chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_SENDER_IMAGE));
+                            chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_SENDER_NAME));
+                            chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_SENDER_ID));
+                        }
+
+                        chatMessage.setMessage(documentChange.getDocument().getString(Constants.KEY_LAST_MESSAGE));
+                        chatMessage.setDateObject(documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP));
+                        
+                        // Lấy ID người gửi tin nhắn cuối cùng
+                        String lastSenderId = documentChange.getDocument().getString("lastSenderId");
+                        chatMessage.setLastSenderId(lastSenderId);
+                        
+                        // Lấy giá trị unreadCount từ Firestore nếu có
+                        if (documentChange.getDocument().getLong("unreadCount") != null) {
+                            chatMessage.setUnreadCount(documentChange.getDocument().getLong("unreadCount").intValue());
+                        }
+                        
+                        conversations.add(chatMessage);
+                    }
                 } else if (documentChange.getType() == DocumentChange.Type.MODIFIED) {
+                    String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
+                    String receiverId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
+                    String lastMessage = documentChange.getDocument().getString(Constants.KEY_LAST_MESSAGE);
+                    Date timestamp = documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP);
+                    String lastSenderId = documentChange.getDocument().getString("lastSenderId");
+                    
                     for (int i = 0; i < conversations.size(); i++) {
-                        String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
-                        String receiverId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
-                        if (conversations.get(i).getSenderId().equals(senderId) && conversations.get(i).getReceiverId().equals(receiverId)) {
-                            conversations.get(i).setMessage(documentChange.getDocument().getString(Constants.KEY_LAST_MESSAGE));
-                            conversations.get(i).setDateObject(documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP));
+                        if ((conversations.get(i).getSenderId().equals(senderId) && conversations.get(i).getReceiverId().equals(receiverId)) ||
+                            (conversations.get(i).getSenderId().equals(receiverId) && conversations.get(i).getReceiverId().equals(senderId))) {
+                            conversations.get(i).setMessage(lastMessage);
+                            conversations.get(i).setDateObject(timestamp);
+                            conversations.get(i).setLastSenderId(lastSenderId);
+                            
+                            // Cập nhật sender và receiver image/name nếu cần
+                            if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
+                                conversations.get(i).setConversionImage(documentChange.getDocument().getString(Constants.KEY_RECEIVER_IMAGE));
+                                conversations.get(i).setConversionName(documentChange.getDocument().getString(Constants.KEY_RECEIVER_NAME));
+                            } else {
+                                conversations.get(i).setConversionImage(documentChange.getDocument().getString(Constants.KEY_SENDER_IMAGE));
+                                conversations.get(i).setConversionName(documentChange.getDocument().getString(Constants.KEY_SENDER_NAME));
+                            }
+                            
+                            // Cập nhật số tin nhắn chưa đọc từ Firestore
+                            if (documentChange.getDocument().getLong("unreadCount") != null) {
+                                conversations.get(i).setUnreadCount(documentChange.getDocument().getLong("unreadCount").intValue());
+                            }
                             break;
                         }
                     }
@@ -172,8 +215,50 @@ public class MainActivity extends BaseActivity implements ConversionListener {
 
     @Override
     public void onConversionClicked(User user) {
+        // Reset số tin nhắn chưa đọc khi người dùng nhấp vào cuộc trò chuyện
+        resetUnreadCountForSender(user.getId());
+        
         Intent intent = new Intent(getApplicationContext(), ChatActivity.class);
         intent.putExtra(Constants.KEY_USER, user);
         startActivity(intent);
+    }
+    
+    // Phương thức kiểm tra xem người dùng đang ở trong cuộc trò chuyện với người gửi hay không
+    private boolean isInChatScreenWith(String senderId) {
+        // Lưu trạng thái cuộc trò chuyện hiện tại
+        String currentChatUserId = preferenceManager.getString("current_chat_user_id");
+        return currentChatUserId != null && currentChatUserId.equals(senderId);
+    }
+    
+    // Phương thức cập nhật số tin nhắn chưa đọc trong Firestore
+    private void updateUnreadCountInFirestore(String senderId, String receiverId, int unreadCount) {
+        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                .whereEqualTo(Constants.KEY_SENDER_ID, senderId)
+                .whereEqualTo(Constants.KEY_RECEIVER_ID, receiverId)
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
+                        DocumentReference documentReference = task.getResult().getDocuments().get(0).getReference();
+                        documentReference.update("unreadCount", unreadCount);
+                    }
+                });
+    }
+    
+    // Phương thức reset số tin nhắn chưa đọc khi người dùng mở cuộc trò chuyện
+    private void resetUnreadCountForSender(String senderId) {
+        // Tìm cuộc trò chuyện trong danh sách và reset số tin nhắn chưa đọc
+        for (ChatMessage conversation : conversations) {
+            if (conversation.getConversionId().equals(senderId)) {
+                // Reset unreadCount trong model
+                conversation.setUnreadCount(0);
+                
+                // Reset unreadCount trong Firestore
+                updateUnreadCountInFirestore(senderId, preferenceManager.getString(Constants.KEY_USER_ID), 0);
+                
+                // Thông báo adapter để cập nhật UI
+                conversationsAdapter.notifyDataSetChanged();
+                break;
+            }
+        }
     }
 }

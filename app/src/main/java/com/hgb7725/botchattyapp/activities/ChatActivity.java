@@ -205,6 +205,21 @@ public class ChatActivity extends BaseActivity {
         binding.imageBack.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         binding.layoutSend.setOnClickListener(v -> sendMessage());
 
+        // Add call button click listeners
+        binding.imageCall.setOnClickListener(v -> {
+            // Start voice call
+            Intent intent = new Intent(getApplicationContext(), VoiceCallActivity.class);
+            intent.putExtra(Constants.KEY_USER, receiverUser);
+            startActivity(intent);
+        });
+
+        binding.imageVideoCall.setOnClickListener(v -> {
+            // Start video call
+            Intent intent = new Intent(getApplicationContext(), VideoCallActivity.class);
+            intent.putExtra(Constants.KEY_USER, receiverUser);
+            startActivity(intent);
+        });
+
         // Add attachment button click listener
         binding.imageAttachment.setOnClickListener(v -> toggleAttachmentOptions());
 

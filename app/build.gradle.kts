@@ -83,4 +83,6 @@ dependencies {
     annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
     implementation("com.android.volley:volley:1.2.1")
     
+    // Agora RTC SDK for voice and video calls
+    implementation("io.agora.rtc:full-sdk:4.0.1")
 }

@@ -33,4 +33,10 @@
     <string name="resend">Resend</string>
     <string name="code_expires_in">Code expires in: </string>
     <string name="empty_number">-</string>
+
+    <!-- Call UI Strings -->
+    <string name="calling">Calling...</string>
+    <string name="call_connected">Connected</string>
+    <string name="call_ended">Call ended</string>
+    <string name="waiting_for_answer">Waiting for answer...</string>
 </resources>

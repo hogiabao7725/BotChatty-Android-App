@@ -14,4 +14,9 @@
     <color name="green">#008000</color>
     <color name="offline_status">#FF0000</color>
     <color name="online_status">#4CAF50</color>
+    
+    <!-- Call UI Colors -->
+    <color name="red">#FF0000</color>
+    <color name="call_control_bg">#80000000</color>
+    <color name="primary_light">#3F51B5</color>
 </resources>

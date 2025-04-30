@@ -3,6 +3,7 @@ package com.hgb7725.botchattyapp.adapters;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
@@ -12,6 +13,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.hgb7725.botchattyapp.activities.ImageViewerActivity;
 import com.hgb7725.botchattyapp.databinding.ItemContainerReceivedFileBinding;
 import com.hgb7725.botchattyapp.databinding.ItemContainerReceivedImageBinding;
 import com.hgb7725.botchattyapp.databinding.ItemContainerReceivedMessageBinding;
@@ -164,6 +166,14 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                     .load(chatMessage.getMessage())
                     .into(binding.imageMessage);
             binding.textDateTime.setText(chatMessage.getDateTime());
+            
+            // Add click listener to open the full-screen image viewer
+            binding.cardImage.setOnClickListener(v -> {
+                Context context = v.getContext();
+                Intent intent = new Intent(context, ImageViewerActivity.class);
+                intent.putExtra("imageUrl", chatMessage.getMessage());
+                context.startActivity(intent);
+            });
         }
     }
 
@@ -181,6 +191,14 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                     .into(binding.imageMessage);
             binding.textDateTime.setText(chatMessage.getDateTime());
             binding.imageProfile.setImageBitmap(receiverProfileImage);
+            
+            // Add click listener to open the full-screen image viewer
+            binding.cardImage.setOnClickListener(v -> {
+                Context context = v.getContext();
+                Intent intent = new Intent(context, ImageViewerActivity.class);
+                intent.putExtra("imageUrl", chatMessage.getMessage());
+                context.startActivity(intent);
+            });
         }
     }
 

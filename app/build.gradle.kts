@@ -85,4 +85,7 @@ dependencies {
     
     // Agora RTC SDK for voice and video calls
     implementation("io.agora.rtc:full-sdk:4.0.1")
+    
+    // PhotoView for pinch zoom functionality
+    implementation("com.github.chrisbanes:PhotoView:2.3.0")
 }

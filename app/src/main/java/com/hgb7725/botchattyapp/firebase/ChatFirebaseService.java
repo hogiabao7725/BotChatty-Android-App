@@ -141,6 +141,9 @@ public class ChatFirebaseService {
     }
 
     public void listenForMessages(String senderId, String receiverId) {
+        // Clear previous messages to avoid duplicates
+        chatMessages.clear();
+        
         eventListener = (value, error) -> {
             if (error != null) {
                 return;
@@ -148,7 +151,8 @@ public class ChatFirebaseService {
             if (value != null) {
                 int count = chatMessages.size();
                 for(DocumentChange documentChange : value.getDocumentChanges()) {
-                    if (documentChange.getType() == DocumentChange.Type.ADDED) {
+                    if (documentChange.getType() == DocumentChange.Type.ADDED || 
+                        documentChange.getType() == DocumentChange.Type.MODIFIED) {
                         ChatMessage chatMessage = new ChatMessage();
                         chatMessage.setSenderId(documentChange.getDocument().getString(Constants.KEY_SENDER_ID));
                         chatMessage.setReceiverId(documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID));
@@ -163,7 +167,22 @@ public class ChatFirebaseService {
                         if (timestamp != null) {
                             chatMessage.setDateObject(timestamp);
                         }
-                        chatMessages.add(chatMessage);
+                        
+                        // Check if we already have this message (by comparing all fields)
+                        boolean isDuplicate = false;
+                        for (ChatMessage existingMessage : chatMessages) {
+                            if (existingMessage.getSenderId().equals(chatMessage.getSenderId()) &&
+                                existingMessage.getReceiverId().equals(chatMessage.getReceiverId()) &&
+                                existingMessage.getMessage().equals(chatMessage.getMessage()) &&
+                                existingMessage.getDateObject().equals(chatMessage.getDateObject())) {
+                                isDuplicate = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!isDuplicate) {
+                            chatMessages.add(chatMessage);
+                        }
                     }
                 }
                 Collections.sort(chatMessages,
@@ -178,6 +197,7 @@ public class ChatFirebaseService {
             }
         };
 
+        // Use a single query with an OR condition to listen for messages in both directions
         database.collection(Constants.KEY_COLLECTION_CHAT)
                 .whereEqualTo(Constants.KEY_SENDER_ID, senderId)
                 .whereEqualTo(Constants.KEY_RECEIVER_ID, receiverId)
@@ -237,7 +257,7 @@ public class ChatFirebaseService {
                                 .whereEqualTo(Constants.KEY_RECEIVER_ID, conversion.get(Constants.KEY_SENDER_ID))
                                 .get()
                                 .addOnCompleteListener(reverseTask -> {
-                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && !reverseTask.getResult().isEmpty()) {
+                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && reverseTask.getResult().isEmpty()) {
                                         // If found in receiver -> sender direction
                                         DocumentReference reverseDocRef = reverseTask.getResult().getDocuments().get(0).getReference();
                                         conversionId = reverseDocRef.getId();

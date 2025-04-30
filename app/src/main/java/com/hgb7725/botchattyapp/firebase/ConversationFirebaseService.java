@@ -66,6 +66,7 @@ public class ConversationFirebaseService {
             return;
         }
         if (value != null) {
+            boolean hasChanges = false;
             for (DocumentChange documentChange : value.getDocumentChanges()) {
                 if (documentChange.getType() == DocumentChange.Type.ADDED) {
                     String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
@@ -109,6 +110,7 @@ public class ConversationFirebaseService {
                         }
                         
                         conversations.add(chatMessage);
+                        hasChanges = true;
                     }
                 } else if (documentChange.getType() == DocumentChange.Type.MODIFIED) {
                     String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
@@ -137,16 +139,37 @@ public class ConversationFirebaseService {
                             if (documentChange.getDocument().getLong("unreadCount") != null) {
                                 conversations.get(i).setUnreadCount(documentChange.getDocument().getLong("unreadCount").intValue());
                             }
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                } else if (documentChange.getType() == DocumentChange.Type.REMOVED) {
+                    // Xử lý trường hợp xóa cuộc trò chuyện nếu cần
+                    String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
+                    String receiverId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
+                    
+                    for (int i = 0; i < conversations.size(); i++) {
+                        if ((conversations.get(i).getSenderId().equals(senderId) && conversations.get(i).getReceiverId().equals(receiverId)) ||
+                            (conversations.get(i).getSenderId().equals(receiverId) && conversations.get(i).getReceiverId().equals(senderId))) {
+                            conversations.remove(i);
+                            hasChanges = true;
                             break;
                         }
                     }
                 }
             }
-            Collections.sort(conversations, (obj1, obj2) ->
-                    obj2.getDateObject().compareTo(obj1.getDateObject()));
-            
-            if (conversationListener != null) {
-                conversationListener.onConversationsLoaded(conversations);
+
+            if (hasChanges) {
+                // Sắp xếp lại cuộc trò chuyện theo thời gian
+                Collections.sort(conversations, (obj1, obj2) ->
+                        obj2.getDateObject().compareTo(obj1.getDateObject()));
+                
+                if (conversationListener != null) {
+                    // Gọi onConversationsUpdated khi có thay đổi
+                    conversationListener.onConversationsUpdated();
+                    // Vẫn gọi onConversationsLoaded để đảm bảo tương thích ngược
+                    conversationListener.onConversationsLoaded(conversations);
+                }
             }
         }
     };

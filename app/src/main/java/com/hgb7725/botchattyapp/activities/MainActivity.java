@@ -20,6 +20,7 @@ import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 
 public class MainActivity extends BaseActivity implements ConversionListener {
 
@@ -123,5 +124,17 @@ public class MainActivity extends BaseActivity implements ConversionListener {
         Intent intent = new Intent(getApplicationContext(), ChatActivity.class);
         intent.putExtra(Constants.KEY_USER, user);
         startActivity(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh the conversation list when returning to MainActivity
+        if (conversationService != null) {
+            // Sắp xếp lại danh sách cuộc trò chuyện theo thứ tự thời gian mới nhất
+            Collections.sort(conversations, (obj1, obj2) ->
+                    obj2.getDateObject().compareTo(obj1.getDateObject()));
+            conversationsAdapter.notifyDataSetChanged();
+        }
     }
 }

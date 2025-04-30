@@ -3,6 +3,7 @@ package com.hgb7725.botchattyapp.activities;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
@@ -17,6 +18,8 @@ import com.hgb7725.botchattyapp.databinding.ActivityVideoCallBinding;
 import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
+
+import java.util.Locale;
 
 import io.agora.rtc2.ChannelMediaOptions;
 import io.agora.rtc2.IRtcEngineEventHandler;
@@ -36,9 +39,12 @@ public class VideoCallActivity extends BaseActivity {
     private boolean isCameraOn = true;
     private boolean isFrontCamera = true;
     private static final String TAG = "VideoCallActivity";
+    private long callStartTime;
+    private Handler durationHandler;
+    private Runnable durationRunnable;
     
     // Agora App ID - Replace with your own App ID from Agora Console
-    private static final String AGORA_APP_ID = "your_agora_app_id";
+    private static final String AGORA_APP_ID = "8271e3645db7490ab53b74ddf137d3e9";
     
     // Permissions
     private static final int PERMISSION_REQUEST_ID = 22;
@@ -56,6 +62,8 @@ public class VideoCallActivity extends BaseActivity {
                 binding.callStatus.setVisibility(View.GONE);
                 binding.progressBar.setVisibility(View.GONE);
                 setupRemoteVideo(uid);
+                // Start call duration timer when user joins
+                startCallDurationTimer();
             });
         }
 
@@ -263,6 +271,7 @@ public class VideoCallActivity extends BaseActivity {
     }
     
     private void endCall() {
+        stopCallDurationTimer();
         if (agoraEngine != null) {
             agoraEngine.leaveChannel();
         }
@@ -279,6 +288,7 @@ public class VideoCallActivity extends BaseActivity {
     
     @Override
     protected void onDestroy() {
+        stopCallDurationTimer();
         super.onDestroy();
         if (agoraEngine != null) {
             agoraEngine.leaveChannel();
@@ -287,6 +297,37 @@ public class VideoCallActivity extends BaseActivity {
                 RtcEngine.destroy();
                 agoraEngine = null;
             }).start();
+        }
+    }
+
+    private void startCallDurationTimer() {
+        binding.textCallDuration.setVisibility(View.VISIBLE);
+        callStartTime = System.currentTimeMillis();
+        durationHandler = new Handler();
+        durationRunnable = new Runnable() {
+            @Override
+            public void run() {
+                long duration = System.currentTimeMillis() - callStartTime;
+                long seconds = duration / 1000;
+                long minutes = seconds / 60;
+                long hours = minutes / 60;
+                seconds = seconds % 60;
+                minutes = minutes % 60;
+
+                String durationText = String.format(Locale.getDefault(),
+                        "%02d:%02d:%02d",
+                        hours, minutes, seconds);
+                binding.textCallDuration.setText(durationText);
+
+                durationHandler.postDelayed(this, 1000);
+            }
+        };
+        durationHandler.post(durationRunnable);
+    }
+
+    private void stopCallDurationTimer() {
+        if (durationHandler != null && durationRunnable != null) {
+            durationHandler.removeCallbacks(durationRunnable);
         }
     }
 }

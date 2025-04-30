@@ -1,7 +1,4 @@
-package com.hgb7725.botchattyapp.utilities;
-
-import java.util.HashMap;
-import java.util.Map;
+package com.hgb7725.botchattyapp.cloudinary;
 
 public class CloudinaryConfig {
 //    private static final String CLOUD_NAME = "doli3j7da";

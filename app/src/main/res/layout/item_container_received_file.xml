@@ -10,8 +10,8 @@
     <!-- Avatar -->
     <com.makeramen.roundedimageview.RoundedImageView
         android:id="@+id/imageProfile"
-        android:layout_width="25dp"
-        android:layout_height="25dp"
+        android:layout_width="@dimen/_25sdp"
+        android:layout_height="@dimen/_25sdp"
         android:scaleType="centerCrop"
         android:background="@drawable/background_image"
         app:riv_oval="true"

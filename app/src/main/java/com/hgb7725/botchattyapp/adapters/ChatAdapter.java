@@ -14,12 +14,15 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.hgb7725.botchattyapp.activities.ImageViewerActivity;
+import com.hgb7725.botchattyapp.activities.VideoPlayerActivity;
 import com.hgb7725.botchattyapp.databinding.ItemContainerReceivedFileBinding;
 import com.hgb7725.botchattyapp.databinding.ItemContainerReceivedImageBinding;
 import com.hgb7725.botchattyapp.databinding.ItemContainerReceivedMessageBinding;
+import com.hgb7725.botchattyapp.databinding.ItemContainerReceivedVideoBinding;
 import com.hgb7725.botchattyapp.databinding.ItemContainerSentFileBinding;
 import com.hgb7725.botchattyapp.databinding.ItemContainerSentImageBinding;
 import com.hgb7725.botchattyapp.databinding.ItemContainerSentMessageBinding;
+import com.hgb7725.botchattyapp.databinding.ItemContainerSentVideoBinding;
 import com.hgb7725.botchattyapp.models.ChatMessage;
 import com.hgb7725.botchattyapp.utilities.FileUtils;
 
@@ -37,6 +40,8 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     public static final int VIEW_TYPE_RECEIVED_IMAGE = 4;
     public static final int VIEW_TYPE_SENT_FILE = 5;
     public static final int VIEW_TYPE_RECEIVED_FILE = 6;
+    public static final int VIEW_TYPE_SENT_VIDEO = 7;
+    public static final int VIEW_TYPE_RECEIVED_VIDEO = 8;
 
     public ChatAdapter(List<ChatMessage> chatMessageList, Bitmap receiverProfileImage, String senderId) {
         this.chatMessageList = chatMessageList;
@@ -61,6 +66,10 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 return new SentFileViewHolder(ItemContainerSentFileBinding.inflate(inflater, parent, false));
             case VIEW_TYPE_RECEIVED_FILE:
                 return new ReceivedFileViewHolder(ItemContainerReceivedFileBinding.inflate(inflater, parent, false));
+            case VIEW_TYPE_SENT_VIDEO:
+                return new SentVideoViewHolder(ItemContainerSentVideoBinding.inflate(inflater, parent, false));
+            case VIEW_TYPE_RECEIVED_VIDEO:
+                return new ReceivedVideoViewHolder(ItemContainerReceivedVideoBinding.inflate(inflater, parent, false));
             default:
                 throw new IllegalArgumentException("Unknown view type: " + viewType);
         }
@@ -88,6 +97,12 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             case VIEW_TYPE_RECEIVED_FILE:
                 ((ReceivedFileViewHolder) holder).setData(chatMessage, receiverProfileImage);
                 break;
+            case VIEW_TYPE_SENT_VIDEO:
+                ((SentVideoViewHolder) holder).setData(chatMessage);
+                break;
+            case VIEW_TYPE_RECEIVED_VIDEO:
+                ((ReceivedVideoViewHolder) holder).setData(chatMessage, receiverProfileImage);
+                break;
         }
     }
 
@@ -102,11 +117,14 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         boolean isSender = message.getSenderId().equals(senderId);
         boolean isImage = "image".equals(message.getType());
         boolean isFile = "file".equals(message.getType());
+        boolean isVideo = "video".equals(message.getType());
 
         if (isSender && isImage) return VIEW_TYPE_SENT_IMAGE;
         if (!isSender && isImage) return VIEW_TYPE_RECEIVED_IMAGE;
         if (isSender && isFile) return VIEW_TYPE_SENT_FILE;
         if (!isSender && isFile) return VIEW_TYPE_RECEIVED_FILE;
+        if (isSender && isVideo) return VIEW_TYPE_SENT_VIDEO;
+        if (!isSender && isVideo) return VIEW_TYPE_RECEIVED_VIDEO;
         return isSender ? VIEW_TYPE_SENT_TEXT : VIEW_TYPE_RECEIVED_TEXT;
     }
 
@@ -241,6 +259,95 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
             binding.fileContainer.setOnClickListener(v -> {
                 FileUtils.confirmAndDownloadFile(v.getContext(), chatMessage.getMessage(), chatMessage.getFileName());
+            });
+        }
+    }
+
+    static class SentVideoViewHolder extends RecyclerView.ViewHolder {
+        private final ItemContainerSentVideoBinding binding;
+
+        SentVideoViewHolder(ItemContainerSentVideoBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
+        }
+
+        void setData(ChatMessage chatMessage) {
+            // Load video thumbnail
+            Glide.with(binding.videoThumbnail.getContext())
+                    .load(chatMessage.getMessage())
+                    .centerCrop()
+                    .into(binding.videoThumbnail);
+            
+            binding.textDateTime.setText(chatMessage.getDateTime());
+            
+            // Set video duration if available
+            if (chatMessage.getFileName() != null && 
+                chatMessage.getFileName().contains("|")) {
+                String[] parts = chatMessage.getFileName().split("\\|");
+                if (parts.length > 1) {
+                    binding.textVideoDuration.setText(parts[1]);
+                }
+            }
+            
+            // Add click listener to open the video player
+            binding.cardVideo.setOnClickListener(v -> {
+                Context context = v.getContext();
+                Intent intent = new Intent(context, VideoPlayerActivity.class);
+                intent.putExtra("videoUrl", chatMessage.getMessage());
+                
+                // Extract filename if in format "filename.mp4|duration"
+                String fileName = chatMessage.getFileName();
+                if (fileName != null && fileName.contains("|")) {
+                    fileName = fileName.split("\\|")[0];
+                }
+                
+                intent.putExtra("fileName", fileName);
+                context.startActivity(intent);
+            });
+        }
+    }
+
+    static class ReceivedVideoViewHolder extends RecyclerView.ViewHolder {
+        private final ItemContainerReceivedVideoBinding binding;
+
+        ReceivedVideoViewHolder(ItemContainerReceivedVideoBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
+        }
+
+        void setData(ChatMessage chatMessage, Bitmap receiverProfileImage) {
+            // Load video thumbnail
+            Glide.with(binding.videoThumbnail.getContext())
+                    .load(chatMessage.getMessage())
+                    .centerCrop()
+                    .into(binding.videoThumbnail);
+                    
+            binding.textDateTime.setText(chatMessage.getDateTime());
+            binding.imageProfile.setImageBitmap(receiverProfileImage);
+            
+            // Set video duration if available
+            if (chatMessage.getFileName() != null && 
+                chatMessage.getFileName().contains("|")) {
+                String[] parts = chatMessage.getFileName().split("\\|");
+                if (parts.length > 1) {
+                    binding.textVideoDuration.setText(parts[1]);
+                }
+            }
+            
+            // Add click listener to open the video player
+            binding.cardVideo.setOnClickListener(v -> {
+                Context context = v.getContext();
+                Intent intent = new Intent(context, VideoPlayerActivity.class);
+                intent.putExtra("videoUrl", chatMessage.getMessage());
+                
+                // Extract filename if in format "filename.mp4|duration"
+                String fileName = chatMessage.getFileName();
+                if (fileName != null && fileName.contains("|")) {
+                    fileName = fileName.split("\\|")[0];
+                }
+                
+                intent.putExtra("fileName", fileName);
+                context.startActivity(intent);
             });
         }
     }

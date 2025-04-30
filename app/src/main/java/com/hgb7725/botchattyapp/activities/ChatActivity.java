@@ -40,6 +40,7 @@ public class ChatActivity extends BaseActivity {
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int PICK_FILE_REQUEST = 2;
     private static final int RECORD_AUDIO_REQUEST = 3;
+    private static final int PICK_VIDEO_REQUEST = 4;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -184,6 +185,12 @@ public class ChatActivity extends BaseActivity {
             Toast.makeText(this, "Audio recording coming soon!", Toast.LENGTH_SHORT).show();
             toggleAttachmentOptions();
         });
+
+        binding.layoutAttachmentOptions.layoutVideo.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
+            startActivityForResult(intent, PICK_VIDEO_REQUEST);
+            toggleAttachmentOptions();
+        });
     }
 
     private void toggleAttachmentOptions() {
@@ -194,7 +201,7 @@ public class ChatActivity extends BaseActivity {
         }
     }
 
-    // Processes the selected media (file and image) based on the request code.
+    // Processes the selected media (file, image, and video) based on the request code.
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -207,6 +214,10 @@ public class ChatActivity extends BaseActivity {
                 Uri fileUri = data.getData();
                 // Handle file upload
                 handleFileUpload(fileUri);
+            } else if (requestCode == PICK_VIDEO_REQUEST && data != null) {
+                Uri videoUri = data.getData();
+                // Handle video upload
+                handleVideoUpload(videoUri);
             }
         }
     }
@@ -245,6 +256,38 @@ public class ChatActivity extends BaseActivity {
 
             @Override
             public void onError(String errorMessage) {
+                Toast.makeText(ChatActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void handleVideoUpload(Uri videoUri) {
+        // Add progress indicator or loading message
+        binding.progressBar.setVisibility(View.VISIBLE);
+        
+        cloudinaryService.uploadVideo(videoUri, new CloudinaryService.UploadCallback() {
+            @Override
+            public void onSuccess(String url, String fileNameWithDuration) {
+                // Format is "filename.mp4|duration"
+                String[] parts = fileNameWithDuration.split("\\|");
+                String fileName = parts[0];
+                String duration = parts.length > 1 ? parts[1] : "00:00";
+                
+                chatFirebaseService.sendVideoMessage(
+                        receiverUser.getId(),
+                        receiverUser.getName(),
+                        receiverUser.getImage(),
+                        url,
+                        fileName,
+                        duration
+                );
+                
+                binding.progressBar.setVisibility(View.GONE);
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                binding.progressBar.setVisibility(View.GONE);
                 Toast.makeText(ChatActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
             }
         });

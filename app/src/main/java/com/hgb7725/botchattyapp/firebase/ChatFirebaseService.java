@@ -125,6 +125,33 @@ public class ChatFirebaseService {
             });
     }
 
+    public void sendVideoMessage(String receiverId, String receiverName, String receiverImage, String videoUrl, String fileName, String duration) {
+        HashMap<String, Object> message = new HashMap<>();
+        message.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+        message.put(Constants.KEY_RECEIVER_ID, receiverId);
+        message.put(Constants.KEY_MESSAGE, videoUrl);
+        message.put("fileName", fileName + "|" + duration); // Store both filename and duration
+        message.put("type", "video");
+        message.put(Constants.KEY_TIMESTAMP, new Date());
+
+        database.collection(Constants.KEY_COLLECTION_CHAT).add(message)
+            .addOnSuccessListener(documentReference -> {
+                HashMap<String, Object> conversion = new HashMap<>();
+                conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+                conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
+                conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
+                conversion.put(Constants.KEY_RECEIVER_ID, receiverId);
+                conversion.put(Constants.KEY_RECEIVER_NAME, receiverName);
+                conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverImage);
+                conversion.put(Constants.KEY_LAST_MESSAGE, "Video");
+                conversion.put(Constants.KEY_TIMESTAMP, new Date());
+                conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
+                conversion.put("unreadCount", com.google.firebase.firestore.FieldValue.increment(1));
+                // Include both cases: conversation exists or not
+                addConversion(conversion);
+            });
+    }
+
     public void markConversationAsRead(String receiverId) {
         // Find the conversation in Firestore and set unreadCount to 0
         database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
@@ -257,7 +284,7 @@ public class ChatFirebaseService {
                                 .whereEqualTo(Constants.KEY_RECEIVER_ID, conversion.get(Constants.KEY_SENDER_ID))
                                 .get()
                                 .addOnCompleteListener(reverseTask -> {
-                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && reverseTask.getResult().isEmpty()) {
+                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && !reverseTask.getResult().isEmpty()) {
                                         // If found in receiver -> sender direction
                                         DocumentReference reverseDocRef = reverseTask.getResult().getDocuments().get(0).getReference();
                                         conversionId = reverseDocRef.getId();

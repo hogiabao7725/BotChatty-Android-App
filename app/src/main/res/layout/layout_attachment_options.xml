@@ -33,6 +33,28 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/layoutVideo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="@dimen/_4sdp">
+
+        <ImageView
+            android:layout_width="@dimen/_24sdp"
+            android:layout_height="@dimen/_24sdp"
+            android:src="@drawable/ic_video"
+            app:tint="@color/primary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/_8sdp"
+            android:text="Video"
+            android:textColor="@color/primary" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/layoutDocument"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -76,4 +98,4 @@
             android:textColor="@color/primary" />
     </LinearLayout>
 
-</LinearLayout> 
+</LinearLayout>

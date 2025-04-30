@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.OpenableColumns;
+import android.util.Log;
 import android.webkit.MimeTypeMap;
 import android.widget.Toast;
 
@@ -21,6 +22,9 @@ import androidx.core.content.FileProvider;
 import com.hgb7725.botchattyapp.R;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 public class FileUtils {
 
@@ -220,6 +224,74 @@ public class FileUtils {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    /**
+     * Downloads a file from an input stream to a specified destination file.
+     * Used for saving files to external storage from network connections.
+     *
+     * @param inputStream The input stream to read from
+     * @param destinationFile The file to write to
+     * @throws IOException If there's an error during file copying
+     */
+    public static void downloadFile(InputStream inputStream, File destinationFile) throws IOException {
+        try (FileOutputStream outputStream = new FileOutputStream(destinationFile)) {
+            byte[] buffer = new byte[8192]; // 8KB buffer
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, read);
+            }
+            outputStream.flush();
+        } finally {
+            inputStream.close();
+        }
+    }
+    
+    /**
+     * Gets the file path from a content URI.
+     * This is a helper method for handling content URIs on different Android versions.
+     *
+     * @param context The application context
+     * @param uri The content URI to resolve
+     * @return The file path as a string, or null if it couldn't be resolved
+     */
+    public static String getFilePathFromUri(Context context, Uri uri) {
+        String filePath = null;
+        
+        if ("content".equals(uri.getScheme())) {
+            Cursor cursor = context.getContentResolver().query(uri, null, null, null, null);
+            try {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (columnIndex != -1) {
+                        String fileName = cursor.getString(columnIndex);
+                        File file = new File(context.getCacheDir(), fileName);
+                        
+                        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+                             FileOutputStream outputStream = new FileOutputStream(file)) {
+                             
+                            byte[] buffer = new byte[4096];
+                            int bytesRead;
+                            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                                outputStream.write(buffer, 0, bytesRead);
+                            }
+                            outputStream.flush();
+                            filePath = file.getAbsolutePath();
+                        } catch (IOException e) {
+                            Log.e("FileUtils", "Error copying file", e);
+                        }
+                    }
+                }
+            } finally {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            }
+        } else if ("file".equals(uri.getScheme())) {
+            filePath = uri.getPath();
+        }
+        
+        return filePath;
     }
 
 }

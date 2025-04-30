@@ -131,7 +131,10 @@ public class MainActivity extends BaseActivity implements ConversionListener {
         super.onResume();
         // Refresh the conversation list when returning to MainActivity
         if (conversationService != null) {
-            // Sắp xếp lại danh sách cuộc trò chuyện theo thứ tự thời gian mới nhất
+            // Force a refresh of conversations from Firebase
+            conversationService.refreshConversations();
+            
+            // Also sort the current list
             Collections.sort(conversations, (obj1, obj2) ->
                     obj2.getDateObject().compareTo(obj1.getDateObject()));
             conversationsAdapter.notifyDataSetChanged();

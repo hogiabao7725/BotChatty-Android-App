@@ -30,6 +30,12 @@
         android:theme="@style/Base.Theme.BotChattyApp"
         tools:targetApi="31">
         
+        <!-- Video Player Activity -->
+        <activity
+            android:name=".activities.VideoPlayerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+            
         <!-- Image Viewer Activity -->
         <activity
             android:name=".activities.ImageViewerActivity"

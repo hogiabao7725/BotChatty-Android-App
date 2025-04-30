@@ -1,6 +1,7 @@
 package com.hgb7725.botchattyapp.cloudinary;
 
 import android.content.Context;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.util.Base64;
 import android.util.Log;
@@ -132,5 +133,80 @@ public class CloudinaryService {
         // Implementation for audio uploads
         Toast.makeText(context, "Audio upload not implemented yet", Toast.LENGTH_SHORT).show();
         callback.onError("Audio upload not implemented yet");
+    }
+
+    public void uploadVideo(Uri videoUri, UploadCallback callback) {
+        try {
+            // Get video metadata for duration
+            MediaMetadataRetriever retriever = new MediaMetadataRetriever();
+            retriever.setDataSource(context, videoUri);
+            String duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+            String formattedDuration = formatDuration(Long.parseLong(duration));
+            retriever.release();
+
+            // Get file name
+            String originalFileName = FileUtils.getFileNameFromUri(context, videoUri);
+            if (originalFileName == null) {
+                originalFileName = "video_" + System.currentTimeMillis() + ".mp4";
+            }
+            String fileName = originalFileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+            // For small videos, we can use base64 encoding
+            InputStream inputStream = context.getContentResolver().openInputStream(videoUri);
+            byte[] videoBytes = new byte[inputStream.available()];
+            inputStream.read(videoBytes);
+            String base64Video = Base64.encodeToString(videoBytes, Base64.NO_WRAP);
+
+            String uploadUrl = CloudinaryConfig.getUploadUrl("video");
+
+            JSONObject params = new JSONObject();
+            String mimeType = context.getContentResolver().getType(videoUri);
+            if (mimeType == null) {
+                mimeType = "video/mp4"; // fallback for video
+            }
+            params.put("file", "data:" + mimeType + ";base64," + base64Video);
+            params.put("upload_preset", CloudinaryConfig.PRESET_VIDEO);
+            params.put("public_id", fileName);
+
+            Toast.makeText(context, "Uploading video...", Toast.LENGTH_SHORT).show();
+
+            JsonObjectRequest request = new JsonObjectRequest(Request.Method.POST, uploadUrl, params,
+                    response -> {
+                        try {
+                            String videoUrl = response.getString("secure_url");
+                            callback.onSuccess(videoUrl, fileName + "|" + formattedDuration);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                            callback.onError("Error parsing response: " + e.getMessage());
+                        }
+                    },
+                    error -> {
+                        String errorMsg = "Unknown error";
+                        if (error.networkResponse != null && error.networkResponse.data != null) {
+                            errorMsg = new String(error.networkResponse.data);
+                        } else if (error.getMessage() != null) {
+                            errorMsg = error.getMessage();
+                        }
+                        Log.e(TAG, "Upload failed: " + errorMsg);
+                        callback.onError("Upload failed: " + errorMsg);
+                    }
+            );
+            requestQueue.add(request);
+        } catch (Exception e) {
+            e.printStackTrace();
+            callback.onError("Upload error: " + e.getMessage());
+        }
+    }
+    
+    private String formatDuration(long durationMs) {
+        int seconds = (int) (durationMs / 1000) % 60;
+        int minutes = (int) (durationMs / (1000 * 60)) % 60;
+        int hours = (int) (durationMs / (1000 * 60 * 60));
+        
+        if (hours > 0) {
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%02d:%02d", minutes, seconds);
+        }
     }
 }

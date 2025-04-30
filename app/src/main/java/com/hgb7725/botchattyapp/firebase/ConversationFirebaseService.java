@@ -211,4 +211,90 @@ public class ConversationFirebaseService {
     private void showToast(String message) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
     }
+    
+    /**
+     * Manually refresh conversations from Firebase
+     * Used when returning to MainActivity from chat
+     */
+    public void refreshConversations() {
+        // Clear existing conversations to avoid duplicates
+        conversations.clear();
+        
+        // Manually trigger a one-time fetch from Firebase
+        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                .whereEqualTo(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID))
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        processConversationDocuments(task.getResult().getDocuments());
+                    }
+                    
+                    // Check for conversations where user is receiver
+                    database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                            .whereEqualTo(Constants.KEY_RECEIVER_ID, preferenceManager.getString(Constants.KEY_USER_ID))
+                            .get()
+                            .addOnCompleteListener(receiverTask -> {
+                                if (receiverTask.isSuccessful() && receiverTask.getResult() != null) {
+                                    processConversationDocuments(receiverTask.getResult().getDocuments());
+                                }
+                                
+                                // Sort and notify listeners after both queries complete
+                                if (!conversations.isEmpty()) {
+                                    Collections.sort(conversations, (obj1, obj2) ->
+                                            obj2.getDateObject().compareTo(obj1.getDateObject()));
+                                    
+                                    if (conversationListener != null) {
+                                        conversationListener.onConversationsLoaded(conversations);
+                                    }
+                                }
+                            });
+                });
+    }
+
+    private void processConversationDocuments(List<com.google.firebase.firestore.DocumentSnapshot> documents) {
+        for (com.google.firebase.firestore.DocumentSnapshot document : documents) {
+            String senderId = document.getString(Constants.KEY_SENDER_ID);
+            String receiverId = document.getString(Constants.KEY_RECEIVER_ID);
+            
+            // Check if conversation already exists in the list
+            boolean conversationExists = false;
+            for (ChatMessage existingChat : conversations) {
+                if ((existingChat.getSenderId().equals(senderId) && existingChat.getReceiverId().equals(receiverId)) ||
+                    (existingChat.getSenderId().equals(receiverId) && existingChat.getReceiverId().equals(senderId))) {
+                    conversationExists = true;
+                    break;
+                }
+            }
+            
+            if (!conversationExists) {
+                ChatMessage chatMessage = new ChatMessage();
+                chatMessage.setSenderId(senderId);
+                chatMessage.setReceiverId(receiverId);
+
+                if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
+                    chatMessage.setConversionImage(document.getString(Constants.KEY_RECEIVER_IMAGE));
+                    chatMessage.setConversionName(document.getString(Constants.KEY_RECEIVER_NAME));
+                    chatMessage.setConversionId(document.getString(Constants.KEY_RECEIVER_ID));
+                } else {
+                    chatMessage.setConversionImage(document.getString(Constants.KEY_SENDER_IMAGE));
+                    chatMessage.setConversionName(document.getString(Constants.KEY_SENDER_NAME));
+                    chatMessage.setConversionId(document.getString(Constants.KEY_SENDER_ID));
+                }
+
+                chatMessage.setMessage(document.getString(Constants.KEY_LAST_MESSAGE));
+                chatMessage.setDateObject(document.getDate(Constants.KEY_TIMESTAMP));
+                
+                // Get the last message sender ID
+                String lastSenderId = document.getString("lastSenderId");
+                chatMessage.setLastSenderId(lastSenderId);
+                
+                // Get the unreadCount value from Firestore if available
+                if (document.getLong("unreadCount") != null) {
+                    chatMessage.setUnreadCount(document.getLong("unreadCount").intValue());
+                }
+                
+                conversations.add(chatMessage);
+            }
+        }
+    }
 }

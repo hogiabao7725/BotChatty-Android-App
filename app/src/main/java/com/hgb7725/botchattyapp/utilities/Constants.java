@@ -25,4 +25,9 @@ public class Constants {
     public static final String KEY_AVAILABILITY = "availability";
     public static final String REMOTE_MSG_AUTHORIZATION = "authorization";
     public static final String REMOTE_MSG_CONTENT_TYPE = "Content-Type";
+    
+    // Online status related constants
+    public static final String KEY_ONLINE_STATUS_VISIBLE = "online_status_visible";
+    public static final int AVAILABILITY_ONLINE = 1;
+    public static final int AVAILABILITY_OFFLINE = 0;
 }

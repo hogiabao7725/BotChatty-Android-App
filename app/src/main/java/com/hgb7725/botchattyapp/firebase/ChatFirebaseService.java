@@ -247,9 +247,19 @@ public class ChatFirebaseService {
                return;
            }
            if (value != null) {
+               // Show online status only when both conditions are true:
+               // 1. User is online (availability == 1)
+               // 2. User has enabled online status display (online_status_visible == true)
+               Boolean isOnlineStatusVisible = value.getBoolean(Constants.KEY_ONLINE_STATUS_VISIBLE);
+               // Nếu không có trường online_status_visible, mặc định là hiển thị
+               if (isOnlineStatusVisible == null) {
+                   isOnlineStatusVisible = true;
+               }
+               
                if (value.getLong(Constants.KEY_AVAILABILITY) != null) {
                    int availability = value.getLong(Constants.KEY_AVAILABILITY).intValue();
-                   boolean isAvailable = availability == 1;
+                   // Chỉ báo online khi cả hai điều kiện đều đúng
+                   boolean isAvailable = (availability == 1) && isOnlineStatusVisible;
                    listener.onAvailabilityChanged(isAvailable);
                }
                

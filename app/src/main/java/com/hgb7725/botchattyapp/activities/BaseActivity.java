@@ -14,6 +14,8 @@ public class BaseActivity extends AppCompatActivity {
     private DocumentReference documentReference;
     private PreferenceManager preferenceManager;
     private static boolean isChangingActivity = false;
+    // Key for online status visibility preference
+    private static final String KEY_ONLINE_STATUS_VISIBLE = "online_status_visible";
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -43,10 +45,26 @@ public class BaseActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         // Only update status if we're not in the middle of changing activities
+        // AND online status visibility is enabled
         if (!isChangingActivity) {
-            documentReference.update(Constants.KEY_AVAILABILITY, 1);
+            if (isOnlineStatusVisible()) {
+                documentReference.update(Constants.KEY_AVAILABILITY, 1);
+            }
         }
         // Reset the flag
         isChangingActivity = false;
+    }
+    
+    /**
+     * Checks if the user has enabled online status visibility
+     * @return true if online status should be visible to others, false otherwise
+     */
+    protected boolean isOnlineStatusVisible() {
+        // First check if the key exists, if not default to true
+        if (!preferenceManager.keyExists(KEY_ONLINE_STATUS_VISIBLE)) {
+            return true; // Default is visible
+        }
+        // Return the saved preference
+        return preferenceManager.getBoolean(KEY_ONLINE_STATUS_VISIBLE);
     }
 }

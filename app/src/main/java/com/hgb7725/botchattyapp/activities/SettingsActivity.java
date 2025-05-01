@@ -25,7 +25,6 @@ public class SettingsActivity extends BaseActivity {
     private ActivitySettingsBinding binding;
     private PreferenceManager preferenceManager;
     private static final String KEY_NOTIFICATIONS_ENABLED = "notifications_enabled";
-    private static final String KEY_ONLINE_STATUS_VISIBLE = "online_status_visible";
     private static final String TAG = "SettingsActivity";
 
     @Override
@@ -120,7 +119,7 @@ public class SettingsActivity extends BaseActivity {
         binding.switchOnlineStatus.setOnCheckedChangeListener((buttonView, isChecked) -> {
             try {
                 // Save online status visibility preference
-                preferenceManager.putBoolean(KEY_ONLINE_STATUS_VISIBLE, isChecked);
+                preferenceManager.putBoolean(Constants.KEY_ONLINE_STATUS_VISIBLE, isChecked);
                 // Update the online status in Firestore
                 updateOnlineStatusVisibility(isChecked);
                 showToast(isChecked ? "Online status visible" : "Online status hidden");
@@ -135,9 +134,6 @@ public class SettingsActivity extends BaseActivity {
             // Initialize notification switch with default value true
             boolean notificationsEnabled = preferenceManager.getBoolean(KEY_NOTIFICATIONS_ENABLED);
             
-            // The error is in this section - we should not attempt to get a Boolean as a String
-            // Instead, we can check if the value exists differently
-            
             // Check if notifications setting exists in shared preferences
             boolean notificationKeyExists = preferenceManager.keyExists(KEY_NOTIFICATIONS_ENABLED);
             if (!notificationKeyExists) {
@@ -149,13 +145,13 @@ public class SettingsActivity extends BaseActivity {
             binding.switchNotifications.setChecked(notificationsEnabled);
             
             // Initialize online status switch
-            boolean onlineStatusVisible = preferenceManager.getBoolean(KEY_ONLINE_STATUS_VISIBLE);
+            boolean onlineStatusVisible = preferenceManager.getBoolean(Constants.KEY_ONLINE_STATUS_VISIBLE);
             
-            // Similarly fix this part
-            boolean onlineStatusKeyExists = preferenceManager.keyExists(KEY_ONLINE_STATUS_VISIBLE);
+            // Check if online status visibility setting exists
+            boolean onlineStatusKeyExists = preferenceManager.keyExists(Constants.KEY_ONLINE_STATUS_VISIBLE);
             if (!onlineStatusKeyExists) {
                 // Key doesn't exist, set default to true
-                preferenceManager.putBoolean(KEY_ONLINE_STATUS_VISIBLE, true);
+                preferenceManager.putBoolean(Constants.KEY_ONLINE_STATUS_VISIBLE, true);
                 onlineStatusVisible = true;
             }
             
@@ -180,7 +176,14 @@ public class SettingsActivity extends BaseActivity {
             DocumentReference documentReference = database.collection(Constants.KEY_COLLECTION_USERS)
                     .document(userId);
             HashMap<String, Object> updates = new HashMap<>();
-            updates.put("online_status_visible", isVisible);
+            // Update the visibility setting
+            updates.put(Constants.KEY_ONLINE_STATUS_VISIBLE, isVisible);
+            
+            // Also immediately update the availability status based on visibility setting
+            // If visibility is turned off, set availability to 0 (offline)
+            // If visibility is turned on, set availability to 1 (online)
+            updates.put(Constants.KEY_AVAILABILITY, isVisible ? Constants.AVAILABILITY_ONLINE : Constants.AVAILABILITY_OFFLINE);
+            
             documentReference.update(updates)
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Firebase error updating online status: " + e.getMessage());

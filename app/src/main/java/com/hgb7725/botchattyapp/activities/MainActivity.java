@@ -85,22 +85,33 @@ public class MainActivity extends BaseActivity implements ConversionListener {
         conversationService.setConversationListener(new ConversationFirebaseService.ConversationListener() {
             @Override
             public void onConversationsLoaded(List<ChatMessage> conversationList) {
-                // Updated conversation list and UI
+                // Process and update conversation list
+                if (conversationList.isEmpty()) {
+                    binding.conversationsRecyclerView.setVisibility(View.VISIBLE);
+                    binding.progressBar.setVisibility(View.GONE);
+                    return;
+                }
+                
+                // Sort conversations by date
+                Collections.sort(conversationList, (obj1, obj2) ->
+                        obj2.getDateObject().compareTo(obj1.getDateObject()));
+                
+                // Update the adapter with new data
                 conversations.clear();
                 conversations.addAll(conversationList);
                 conversationsAdapter.notifyDataSetChanged();
-                binding.conversationsRecyclerView.smoothScrollToPosition(0);
                 binding.conversationsRecyclerView.setVisibility(View.VISIBLE);
                 binding.progressBar.setVisibility(View.GONE);
             }
 
             @Override
             public void onConversationsUpdated() {
-                // Update adapter when there is a change
+                // Sort conversations by date again after updates
+                Collections.sort(conversations, (obj1, obj2) ->
+                        obj2.getDateObject().compareTo(obj1.getDateObject()));
                 conversationsAdapter.notifyDataSetChanged();
             }
         });
-
 
         // Start listening to conversations
         conversationService.listenConversations();

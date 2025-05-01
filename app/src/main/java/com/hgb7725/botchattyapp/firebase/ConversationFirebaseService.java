@@ -113,15 +113,20 @@ public class ConversationFirebaseService {
                         hasChanges = true;
                     }
                 } else if (documentChange.getType() == DocumentChange.Type.MODIFIED) {
+                    // This is the critical section for real-time updates
                     String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
                     String receiverId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
                     String lastMessage = documentChange.getDocument().getString(Constants.KEY_LAST_MESSAGE);
                     Date timestamp = documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP);
                     String lastSenderId = documentChange.getDocument().getString("lastSenderId");
                     
+                    boolean foundConversation = false;
                     for (int i = 0; i < conversations.size(); i++) {
                         if ((conversations.get(i).getSenderId().equals(senderId) && conversations.get(i).getReceiverId().equals(receiverId)) ||
                             (conversations.get(i).getSenderId().equals(receiverId) && conversations.get(i).getReceiverId().equals(senderId))) {
+                            
+                            foundConversation = true;
+                            // Update the conversation data
                             conversations.get(i).setMessage(lastMessage);
                             conversations.get(i).setDateObject(timestamp);
                             conversations.get(i).setLastSenderId(lastSenderId);
@@ -135,16 +140,58 @@ public class ConversationFirebaseService {
                                 conversations.get(i).setConversionName(documentChange.getDocument().getString(Constants.KEY_SENDER_NAME));
                             }
                             
-                            // Update unread message count from Firestore
-                            if (documentChange.getDocument().getLong("unreadCount") != null) {
-                                conversations.get(i).setUnreadCount(documentChange.getDocument().getLong("unreadCount").intValue());
+                            // Check if current user is in chat with the sender
+                            String currentChatUserId = preferenceManager.getString("current_chat_user_id");
+                            boolean isInChatWithSender = (currentChatUserId != null && 
+                                                         (currentChatUserId.equals(senderId) || 
+                                                          currentChatUserId.equals(receiverId)));
+                            
+                            // Only update unread count if user is NOT currently chatting with this user
+                            if (!isInChatWithSender) {
+                                // Update unread message count from Firestore
+                                if (documentChange.getDocument().getLong("unreadCount") != null) {
+                                    conversations.get(i).setUnreadCount(documentChange.getDocument().getLong("unreadCount").intValue());
+                                }
+                            } else {
+                                // If user is in chat with the sender, reset unread count
+                                conversations.get(i).setUnreadCount(0);
                             }
+                            
                             hasChanges = true;
                             break;
                         }
                     }
+                    
+                    // If conversation not found in our list but got a MODIFIED event,
+                    // it might be a new conversation that we missed, so add it
+                    if (!foundConversation) {
+                        // Create a new conversation object
+                        ChatMessage chatMessage = new ChatMessage();
+                        chatMessage.setSenderId(senderId);
+                        chatMessage.setReceiverId(receiverId);
+                        chatMessage.setMessage(lastMessage);
+                        chatMessage.setDateObject(timestamp);
+                        chatMessage.setLastSenderId(lastSenderId);
+                        
+                        if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
+                            chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_RECEIVER_IMAGE));
+                            chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_RECEIVER_NAME));
+                            chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID));
+                        } else {
+                            chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_SENDER_IMAGE));
+                            chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_SENDER_NAME));
+                            chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_SENDER_ID));
+                        }
+                        
+                        if (documentChange.getDocument().getLong("unreadCount") != null) {
+                            chatMessage.setUnreadCount(documentChange.getDocument().getLong("unreadCount").intValue());
+                        }
+                        
+                        conversations.add(chatMessage);
+                        hasChanges = true;
+                    }
                 } else if (documentChange.getType() == DocumentChange.Type.REMOVED) {
-                    // Xử lý trường hợp xóa cuộc trò chuyện nếu cần
+                    // Handle conversation removal if needed
                     String senderId = documentChange.getDocument().getString(Constants.KEY_SENDER_ID);
                     String receiverId = documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID);
                     
@@ -160,14 +207,14 @@ public class ConversationFirebaseService {
             }
 
             if (hasChanges) {
-                // Sắp xếp lại cuộc trò chuyện theo thời gian
+                // Sort conversations by timestamp
                 Collections.sort(conversations, (obj1, obj2) ->
                         obj2.getDateObject().compareTo(obj1.getDateObject()));
                 
                 if (conversationListener != null) {
-                    // Gọi onConversationsUpdated khi có thay đổi
+                    // First notify that conversations were updated (for UI refresh)
                     conversationListener.onConversationsUpdated();
-                    // Vẫn gọi onConversationsLoaded để đảm bảo tương thích ngược
+                    // Then provide the full list (for complete refresh if needed)
                     conversationListener.onConversationsLoaded(conversations);
                 }
             }

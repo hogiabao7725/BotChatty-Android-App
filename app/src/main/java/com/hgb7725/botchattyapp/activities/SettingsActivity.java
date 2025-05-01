@@ -5,24 +5,39 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Base64;
-import android.view.View;
-import android.widget.Toast;
 import android.util.Log;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatButton;
+import androidx.appcompat.widget.AppCompatImageView;
+import androidx.appcompat.widget.SwitchCompat;
 
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.hgb7725.botchattyapp.R;
 import com.hgb7725.botchattyapp.databinding.ActivitySettingsBinding;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
+import com.makeramen.roundedimageview.RoundedImageView;
 
 import java.util.HashMap;
 
-public class SettingsActivity extends BaseActivity {
-    
-    private ActivitySettingsBinding binding;
+public class SettingsActivity extends AppCompatActivity {
+
+    private SwitchCompat switchNotifications;
+    private SwitchCompat switchOnlineStatus;
+    private AppCompatButton buttonLogout;
+    private AppCompatButton buttonChangePassword;
+    private AppCompatButton buttonDeleteAccount;
+    private TextView textUsername;
+    private TextView textEmail;
+    private RoundedImageView imageProfile;
     private PreferenceManager preferenceManager;
     private static final String KEY_NOTIFICATIONS_ENABLED = "notifications_enabled";
     private static final String TAG = "SettingsActivity";
@@ -30,93 +45,65 @@ public class SettingsActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        try {
-            binding = ActivitySettingsBinding.inflate(getLayoutInflater());
-            setContentView(binding.getRoot());
-            
-            preferenceManager = new PreferenceManager(getApplicationContext());
-            
-            loadUserDetails();
-            setListeners();
-        } catch (Exception e) {
-            Log.e(TAG, "Error in onCreate: " + e.getMessage());
-            showToast("Error loading settings. Please try again.");
-            finish();
-        }
+        setContentView(R.layout.activity_settings);
+        
+        preferenceManager = new PreferenceManager(getApplicationContext());
+        
+        initViews();
+        setListeners();
+        loadUserData();
     }
     
-    private void loadUserDetails() {
-        try {
-            // Set user name
-            String name = preferenceManager.getString(Constants.KEY_NAME);
-            if (name != null) {
-                binding.textUsername.setText(name);
-            } else {
-                binding.textUsername.setText("User");
-            }
-            
-            // Set user email
-            String email = preferenceManager.getString(Constants.KEY_EMAIL);
-            if (email != null) {
-                binding.textEmail.setText(email);
-            } else {
-                binding.textEmail.setText("No email available");
-            }
-            
-            // Set profile image
-            String imageString = preferenceManager.getString(Constants.KEY_IMAGE);
-            if (imageString != null) {
-                byte[] bytes = Base64.decode(imageString, Base64.DEFAULT);
-                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                binding.imageProfile.setImageBitmap(bitmap);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading user details: " + e.getMessage());
-            // Don't crash if we can't load user details
-        }
+    private void initViews() {
+        // Initialize views
+        AppCompatImageView imageBack = findViewById(R.id.imageBack);
+        imageProfile = findViewById(R.id.imageProfile);
+        textUsername = findViewById(R.id.textUsername);
+        textEmail = findViewById(R.id.textEmail);
+        switchNotifications = findViewById(R.id.switchNotifications);
+        switchOnlineStatus = findViewById(R.id.switchOnlineStatus);
+        buttonLogout = findViewById(R.id.buttonLogout);
+        buttonChangePassword = findViewById(R.id.buttonChangePassword);
+        buttonDeleteAccount = findViewById(R.id.buttonDeleteAccount);
+        
+        // Initialize setting items
+        LinearLayout layoutPrivacy = findViewById(R.id.layoutPrivacy);
+        LinearLayout layoutHelp = findViewById(R.id.layoutHelp);
+        LinearLayout layoutAbout = findViewById(R.id.layoutAbout);
     }
     
     private void setListeners() {
-        // Back button listener
-        binding.imageBack.setOnClickListener(v -> onBackPressed());
+        // Set up back button
+        AppCompatImageView imageBack = findViewById(R.id.imageBack);
+        imageBack.setOnClickListener(v -> onBackPressed());
         
-        // Logout button listener
-        binding.buttonLogout.setOnClickListener(v -> signOut());
-        
-        // Change Password button listener
-        binding.buttonChangePassword.setOnClickListener(v -> {
-            showToast("Change Password feature coming soon!");
+        // Set up settings navigation
+        LinearLayout layoutPrivacy = findViewById(R.id.layoutPrivacy);
+        layoutPrivacy.setOnClickListener(v -> {
+            Intent intent = new Intent(SettingsActivity.this, PrivacyPolicyActivity.class);
+            startActivity(intent);
         });
         
-        // Delete Account button listener
-        binding.buttonDeleteAccount.setOnClickListener(v -> {
-            showToast("Delete Account feature coming soon!");
+        LinearLayout layoutHelp = findViewById(R.id.layoutHelp);
+        layoutHelp.setOnClickListener(v -> {
+            Intent intent = new Intent(SettingsActivity.this, HelpSupportActivity.class);
+            startActivity(intent);
         });
         
-        // Privacy policy listener
-        binding.layoutPrivacy.setOnClickListener(v -> {
-            showToast("Privacy Policy coming soon!");
+        LinearLayout layoutAbout = findViewById(R.id.layoutAbout);
+        layoutAbout.setOnClickListener(v -> {
+            Intent intent = new Intent(SettingsActivity.this, AboutActivity.class);
+            startActivity(intent);
         });
         
-        // Help & support listener
-        binding.layoutHelp.setOnClickListener(v -> {
-            showToast("Help & Support coming soon!");
-        });
-        
-        // About listener
-        binding.layoutAbout.setOnClickListener(v -> {
-            showToast("About BotChatty App coming soon!");
-        });
-        
-        // Notifications toggle listener
-        binding.switchNotifications.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        // Set up switch listeners
+        switchNotifications.setOnCheckedChangeListener((buttonView, isChecked) -> {
             // Save notification preference
             preferenceManager.putBoolean(KEY_NOTIFICATIONS_ENABLED, isChecked);
             showToast(isChecked ? "Notifications enabled" : "Notifications disabled");
         });
         
-        // Online Status toggle listener
-        binding.switchOnlineStatus.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        switchOnlineStatus.setOnCheckedChangeListener((buttonView, isChecked) -> {
             try {
                 // Save online status visibility preference
                 preferenceManager.putBoolean(Constants.KEY_ONLINE_STATUS_VISIBLE, isChecked);
@@ -127,6 +114,17 @@ public class SettingsActivity extends BaseActivity {
                 Log.e(TAG, "Error updating online status: " + e.getMessage());
                 showToast("Error updating status. Please try again.");
             }
+        });
+        
+        // Set up button listeners
+        buttonLogout.setOnClickListener(v -> signOut());
+        
+        buttonChangePassword.setOnClickListener(v -> {
+            showToast("Change Password feature coming soon!");
+        });
+        
+        buttonDeleteAccount.setOnClickListener(v -> {
+            showDeleteAccountConfirmation();
         });
         
         // Initialize notification switch with saved preference
@@ -142,7 +140,7 @@ public class SettingsActivity extends BaseActivity {
                 notificationsEnabled = true;
             }
             
-            binding.switchNotifications.setChecked(notificationsEnabled);
+            switchNotifications.setChecked(notificationsEnabled);
             
             // Initialize online status switch
             boolean onlineStatusVisible = preferenceManager.getBoolean(Constants.KEY_ONLINE_STATUS_VISIBLE);
@@ -155,12 +153,43 @@ public class SettingsActivity extends BaseActivity {
                 onlineStatusVisible = true;
             }
             
-            binding.switchOnlineStatus.setChecked(onlineStatusVisible);
+            switchOnlineStatus.setChecked(onlineStatusVisible);
         } catch (Exception e) {
             Log.e(TAG, "Error initializing switches: " + e.getMessage());
             // Set defaults if there's an error
-            binding.switchNotifications.setChecked(true);
-            binding.switchOnlineStatus.setChecked(true);
+            switchNotifications.setChecked(true);
+            switchOnlineStatus.setChecked(true);
+        }
+    }
+    
+    private void loadUserData() {
+        try {
+            // Set user name
+            String name = preferenceManager.getString(Constants.KEY_NAME);
+            if (name != null) {
+                textUsername.setText(name);
+            } else {
+                textUsername.setText("User");
+            }
+            
+            // Set user email
+            String email = preferenceManager.getString(Constants.KEY_EMAIL);
+            if (email != null) {
+                textEmail.setText(email);
+            } else {
+                textEmail.setText("No email available");
+            }
+            
+            // Set profile image
+            String imageString = preferenceManager.getString(Constants.KEY_IMAGE);
+            if (imageString != null) {
+                byte[] bytes = Base64.decode(imageString, Base64.DEFAULT);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                imageProfile.setImageBitmap(bitmap);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading user details: " + e.getMessage());
+            // Don't crash if we can't load user details
         }
     }
     
@@ -235,5 +264,19 @@ public class SettingsActivity extends BaseActivity {
             startActivity(new Intent(getApplicationContext(), SignInActivity.class));
             finish();
         }
+    }
+    
+    private void showDeleteAccountConfirmation() {
+        // Show a confirmation dialog before deleting account
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Delete Account");
+        builder.setMessage("Are you sure you want to delete your account? This action cannot be undone.");
+        builder.setPositiveButton("Delete", (dialog, which) -> {
+            // Handle account deletion logic here
+            Toast.makeText(SettingsActivity.this, "Account deletion initiated", Toast.LENGTH_SHORT).show();
+            // You would implement actual account deletion logic here
+        });
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
     }
 }

@@ -34,6 +34,21 @@
             android:name=".activities.SettingsActivity"
             android:exported="false" />
             
+        <!-- Privacy Policy Activity -->
+        <activity
+            android:name=".activities.PrivacyPolicyActivity"
+            android:exported="false" />
+            
+        <!-- Help & Support Activity -->
+        <activity
+            android:name=".activities.HelpSupportActivity"
+            android:exported="false" />
+            
+        <!-- About Activity -->
+        <activity
+            android:name=".activities.AboutActivity"
+            android:exported="false" />
+            
         <!-- Video Player Activity -->
         <activity
             android:name=".activities.VideoPlayerActivity"

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    
+    <!-- Background -->
+    <path
+        android:fillColor="#E1BEE7"
+        android:pathData="M0,0h200v200h-200z" />
+    
+    <!-- Stylized person silhouette -->
+    <path
+        android:fillColor="#9C27B0"
+        android:pathData="M100,60 A30,30 0 1,1 100,120 A30,30 0 1,1 100,60" />
+    <path
+        android:fillColor="#9C27B0"
+        android:pathData="M55,150 A45,60 0 0,0 145,150 L145,200 L55,200 Z" />
+    
+    <!-- Text -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M85,90 L115,90 L115,95 L85,95 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M75,80 L85,80 L85,85 L75,85 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M115,80 L125,80 L125,85 L115,85 Z" />
+</vector>

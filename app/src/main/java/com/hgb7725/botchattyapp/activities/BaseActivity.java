@@ -12,11 +12,13 @@ import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
 public class BaseActivity extends AppCompatActivity {
     private DocumentReference documentReference;
+    private PreferenceManager preferenceManager;
+    private static boolean isChangingActivity = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        PreferenceManager preferenceManager = new PreferenceManager(getApplicationContext());
+        preferenceManager = new PreferenceManager(getApplicationContext());
         FirebaseFirestore database = FirebaseFirestore.getInstance();
         documentReference = database.collection(Constants.KEY_COLLECTION_USERS)
                 .document(preferenceManager.getString(Constants.KEY_USER_ID));
@@ -25,12 +27,26 @@ public class BaseActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        documentReference.update(Constants.KEY_AVAILABILITY, 0);
+        // Set the flag when activity is paused
+        isChangingActivity = true;
+
+        new android.os.Handler().postDelayed(() -> {
+            if (isChangingActivity && isFinishing()) {
+                documentReference.update(Constants.KEY_AVAILABILITY, 0);
+            }
+            // Reset the flag after a short delay
+            isChangingActivity = false;
+        }, 300);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        documentReference.update(Constants.KEY_AVAILABILITY, 1);
+        // Only update status if we're not in the middle of changing activities
+        if (!isChangingActivity) {
+            documentReference.update(Constants.KEY_AVAILABILITY, 1);
+        }
+        // Reset the flag
+        isChangingActivity = false;
     }
 }

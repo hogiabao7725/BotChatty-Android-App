@@ -30,6 +30,10 @@ public class PreferenceManager {
     public String getString(String key) {
         return sharedPreferences.getString(key, null);
     }
+    
+    public boolean keyExists(String key) {
+        return sharedPreferences.contains(key);
+    }
 
     public void clear() {
         SharedPreferences.Editor editor = sharedPreferences.edit();

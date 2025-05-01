@@ -59,9 +59,15 @@ public class MainActivity extends BaseActivity implements ConversionListener {
     }
 
     private void setListeners() {
-        binding.imageSignOut.setOnClickListener(v -> performSignOut());
+        // Change from logout to opening settings
+        binding.imageSettings.setOnClickListener(v -> navigateToSettings());
         binding.fabNewChat.setOnClickListener(v ->
                 startActivity(new Intent(getApplicationContext(), UsersActivity.class)));
+    }
+
+    private void navigateToSettings() {
+        Intent intent = new Intent(getApplicationContext(), SettingsActivity.class);
+        startActivity(intent);
     }
 
     private void loadUserDetails() {
@@ -98,22 +104,6 @@ public class MainActivity extends BaseActivity implements ConversionListener {
 
         // Start listening to conversations
         conversationService.listenConversations();
-    }
-
-    private void performSignOut() {
-        showToast("Signing Out ...");
-        userService.signOut(new UserFirebaseService.SignOutListener() {
-            @Override
-            public void onSignOutSuccess() {
-                startActivity(new Intent(getApplicationContext(), SignInActivity.class));
-                finish();
-            }
-
-            @Override
-            public void onSignOutFailure(String errorMessage) {
-                showToast(errorMessage);
-            }
-        });
     }
 
     @Override

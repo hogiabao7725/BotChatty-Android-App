@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -62,6 +63,15 @@ public class VideoCallActivity extends BaseActivity {
                 binding.callStatus.setVisibility(View.GONE);
                 binding.progressBar.setVisibility(View.GONE);
                 setupRemoteVideo(uid);
+                
+                // Make sure local video view remains visible and on top
+                if (isCameraOn) {
+                    binding.localVideoView.setVisibility(View.VISIBLE);
+                    binding.localVideoView.bringToFront();
+                    // Re-setup local video to ensure it's displaying properly
+                    setupLocalVideo();
+                }
+                
                 // Start call duration timer when user joins
                 startCallDurationTimer();
             });
@@ -219,6 +229,13 @@ public class VideoCallActivity extends BaseActivity {
         // Create a SurfaceView object
         SurfaceView surfaceView = new SurfaceView(getBaseContext());
         
+        // Set layout parameters to fill the parent view
+        surfaceView.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                android.view.Gravity.CENTER
+        ));
+        
         // Add the view to the layout
         binding.localVideoView.addView(surfaceView);
         
@@ -239,15 +256,27 @@ public class VideoCallActivity extends BaseActivity {
         
         // Create a SurfaceView object for remote view
         SurfaceView surfaceView = new SurfaceView(getBaseContext());
+        
+        // Set layout parameters to fill the parent view
+        surfaceView.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                android.view.Gravity.CENTER
+        ));
+        
         binding.remoteVideoView.addView(surfaceView);
         
-        // Setup the video canvas
+        // Setup the video canvas - Use RENDER_MODE_HIDDEN instead of RENDER_MODE_FIT
+        // This will crop the video but fill the entire space without black bars
         VideoCanvas remoteCanvas = new VideoCanvas(
                 surfaceView,
-                VideoCanvas.RENDER_MODE_FIT,
+                VideoCanvas.RENDER_MODE_HIDDEN,
                 uid
         );
         agoraEngine.setupRemoteVideo(remoteCanvas);
+        
+        // Make sure remote view container has proper background color
+        binding.remoteVideoView.setBackgroundColor(getResources().getColor(android.R.color.black));
     }
     
     private void joinChannel() {

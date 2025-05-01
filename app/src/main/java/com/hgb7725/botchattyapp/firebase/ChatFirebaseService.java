@@ -12,12 +12,14 @@ import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 
 public class ChatFirebaseService {
     private final FirebaseFirestore database;
@@ -193,6 +195,8 @@ public class ChatFirebaseService {
                         Date timestamp = documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP);
                         if (timestamp != null) {
                             chatMessage.setDateObject(timestamp);
+                            // Thêm mã này để chuyển đổi timestamp thành định dạng thời gian
+                            chatMessage.setDateTime(getReadableDateTime(timestamp));
                         }
                         
                         // Check if we already have this message (by comparing all fields)
@@ -376,5 +380,9 @@ public class ChatFirebaseService {
 
     public List<ChatMessage> getChatMessages() {
         return chatMessages;
+    }
+
+    private String getReadableDateTime(Date date) {
+        return new SimpleDateFormat("MMMM dd, yyyy - hh:mm a", Locale.getDefault()).format(date);
     }
 }

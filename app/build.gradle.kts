@@ -88,4 +88,7 @@ dependencies {
     
     // PhotoView for pinch zoom functionality
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
+    
+    // Facebook Shimmer message typing effect
+    implementation("com.facebook.shimmer:shimmer:0.5.0")
 }

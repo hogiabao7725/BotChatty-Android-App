@@ -33,7 +33,8 @@ public class BaseActivity extends AppCompatActivity {
         isChangingActivity = true;
 
         new android.os.Handler().postDelayed(() -> {
-            if (isChangingActivity && isFinishing()) {
+            // If the activity is finishing (not changing to another activity) then set the status to offline
+            if (isChangingActivity && (isFinishing() || isTaskRoot())) {
                 documentReference.update(Constants.KEY_AVAILABILITY, 0);
             }
             // Reset the flag after a short delay

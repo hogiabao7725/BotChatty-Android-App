@@ -28,7 +28,7 @@ import com.makeramen.roundedimageview.RoundedImageView;
 
 import java.util.HashMap;
 
-public class SettingsActivity extends AppCompatActivity {
+public class SettingsActivity extends BaseActivity {
 
     private SwitchCompat switchNotifications;
     private SwitchCompat switchOnlineStatus;

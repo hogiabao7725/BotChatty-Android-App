@@ -243,7 +243,11 @@ public class SettingsActivity extends BaseActivity {
             DocumentReference documentReference = database.collection(Constants.KEY_COLLECTION_USERS)
                     .document(userId);
             HashMap<String, Object> updates = new HashMap<>();
+            // Set user as offline when signing out
+            updates.put(Constants.KEY_AVAILABILITY, Constants.AVAILABILITY_OFFLINE);
+            // Delete FCM token
             updates.put(Constants.KEY_FCM_TOKEN, FieldValue.delete());
+            
             documentReference.update(updates)
                     .addOnSuccessListener(unused -> {
                         preferenceManager.clear();

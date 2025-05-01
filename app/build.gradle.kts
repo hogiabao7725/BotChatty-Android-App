@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.constraintlayout)
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.firestore)
+    implementation(libs.lifecycle.process)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

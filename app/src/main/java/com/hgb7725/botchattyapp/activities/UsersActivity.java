@@ -2,6 +2,8 @@ package com.hgb7725.botchattyapp.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -18,14 +20,12 @@ import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 import java.util.ArrayList;
 import java.util.List;
 
-/*
-     * This activity extends AppCompatActivity to support backward compatibility
-     * and provide modern UI features like Toolbar and Material Design.
-     */
 public class UsersActivity extends BaseActivity implements UserListener {
 
     private ActivityUsersBinding binding;
     private PreferenceManager preferenceManager;
+    private List<User> allUsers;
+    private UsersAdapter usersAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,12 +33,63 @@ public class UsersActivity extends BaseActivity implements UserListener {
         binding = ActivityUsersBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         preferenceManager = new PreferenceManager(getApplicationContext());
+        allUsers = new ArrayList<>();
         getUsers();
         setListeners();
     }
 
     private void setListeners() {
         binding.imageBack.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
+        
+        // Set up text change listener for search field
+        binding.inputSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                // Not needed
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // Not needed
+                filterUsers(s.toString());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                // Not needed
+            }
+        });
+    }
+
+    private void filterUsers(String query) {
+        if (allUsers == null || allUsers.isEmpty()) {
+            return;
+        }
+        
+        query = query.toLowerCase().trim();
+        List<User> filteredList = new ArrayList<>();
+        
+        if (query.isEmpty()) {
+            filteredList.addAll(allUsers);
+        } else {
+            for (User user : allUsers) {
+                if (user.getName().toLowerCase().contains(query) || 
+                        user.getEmail().toLowerCase().contains(query)) {
+                    filteredList.add(user);
+                }
+            }
+        }
+
+        if (filteredList.isEmpty()) {
+            binding.textErrorMessage.setText("No matching users found");
+            binding.textErrorMessage.setVisibility(View.VISIBLE);
+            binding.usersRecyclerView.setVisibility(View.GONE);
+        } else {
+            binding.textErrorMessage.setVisibility(View.GONE);
+            binding.usersRecyclerView.setVisibility(View.VISIBLE);
+            usersAdapter = new UsersAdapter(filteredList, this);
+            binding.usersRecyclerView.setAdapter(usersAdapter);
+        }
     }
 
     private void getUsers() {
@@ -50,7 +101,7 @@ public class UsersActivity extends BaseActivity implements UserListener {
                     loading(false);
                     String currentUserId = preferenceManager.getString(Constants.KEY_USER_ID);
                     if (task.isSuccessful() && task.getResult() != null) {
-                        List<User> users = new ArrayList<>();
+                        allUsers = new ArrayList<>();
                         for (QueryDocumentSnapshot queryDocumentSnapshot : task.getResult()) {
                             if (currentUserId.equals(queryDocumentSnapshot.getId())) {
                                 continue;
@@ -61,10 +112,10 @@ public class UsersActivity extends BaseActivity implements UserListener {
                             user.setImage(queryDocumentSnapshot.getString(Constants.KEY_IMAGE));
                             user.setToken(queryDocumentSnapshot.getString(Constants.KEY_FCM_TOKEN));
                             user.setId(queryDocumentSnapshot.getId());
-                            users.add(user);
+                            allUsers.add(user);
                         }
-                        if (users.size() > 0) {
-                            UsersAdapter usersAdapter = new UsersAdapter(users, this);
+                        if (allUsers.size() > 0) {
+                            usersAdapter = new UsersAdapter(allUsers, this);
                             // attach adapter to RecyclerView and display list of users
                             binding.usersRecyclerView.setAdapter(usersAdapter);
                             binding.usersRecyclerView.setVisibility(View.VISIBLE);
@@ -78,7 +129,7 @@ public class UsersActivity extends BaseActivity implements UserListener {
     }
 
     private void showErrorMessage() {
-        binding.textErrorMessage.setText(String.format("%s", "No User Available!"));
+        binding.textErrorMessage.setText("No users (Problem)");
         binding.textErrorMessage.setVisibility(View.VISIBLE);
     }
 

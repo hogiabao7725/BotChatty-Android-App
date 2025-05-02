@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Base64;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -11,7 +12,9 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.hgb7725.botchattyapp.databinding.ActivityUserProfileBinding;
 import com.hgb7725.botchattyapp.firebase.UserFirebaseService;
+import com.hgb7725.botchattyapp.firebase.UserRelationshipService;
 import com.hgb7725.botchattyapp.models.User;
+import com.hgb7725.botchattyapp.utilities.BlockStatusChecker;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
@@ -21,7 +24,10 @@ public class UserProfileActivity extends AppCompatActivity {
     private User user;
     private PreferenceManager preferenceManager;
     private UserFirebaseService userFirebaseService;
+    private UserRelationshipService relationshipService;
+    private BlockStatusChecker blockStatusChecker;
     private String userId;
+    private static final String TAG = "UserProfileActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,6 +37,8 @@ public class UserProfileActivity extends AppCompatActivity {
         
         preferenceManager = new PreferenceManager(getApplicationContext());
         userFirebaseService = new UserFirebaseService(this, preferenceManager);
+        relationshipService = new UserRelationshipService(this, preferenceManager);
+        blockStatusChecker = new BlockStatusChecker(this, preferenceManager);
         
         // Show loading state
         showLoading(true);
@@ -40,6 +48,7 @@ public class UserProfileActivity extends AppCompatActivity {
         
         if (userId != null) {
             loadUserDetails();
+            loadRelationshipStatus();
         } else {
             Toast.makeText(this, "User ID not available", Toast.LENGTH_SHORT).show();
             finish();
@@ -64,6 +73,25 @@ public class UserProfileActivity extends AppCompatActivity {
                 Toast.makeText(UserProfileActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
                 // Go back to previous screen if we can't load user data
                 finish();
+            }
+        });
+    }
+    
+    private void loadRelationshipStatus() {
+        relationshipService.getRelationshipStatus(userId, new UserRelationshipService.RelationshipStatusListener() {
+            @Override
+            public void onStatusLoaded(boolean isBlocked, boolean isMuted) {
+                // Update UI to reflect the current relationship status
+                binding.switchBlock.setChecked(isBlocked);
+                binding.switchMute.setChecked(isMuted);
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                Log.e(TAG, "Failed to load relationship status: " + errorMessage);
+                // Default to unblocked/unmuted if we can't load status
+                binding.switchBlock.setChecked(false);
+                binding.switchMute.setChecked(false);
             }
         });
     }
@@ -105,17 +133,33 @@ public class UserProfileActivity extends AppCompatActivity {
         
         // Set listeners for the action buttons and switches
         binding.layoutMuteNotifications.setOnClickListener(v -> {
-            binding.switchMute.toggle();
-            // Placeholder for mute functionality
-            String status = binding.switchMute.isChecked() ? "muted" : "unmuted";
-            Toast.makeText(this, "Notifications " + status, Toast.LENGTH_SHORT).show();
+            boolean newMuteStatus = !binding.switchMute.isChecked();
+            binding.switchMute.setChecked(newMuteStatus);
+            
+            // Update mute status in Firebase
+            updateMuteStatus(newMuteStatus);
+        });
+        
+        binding.switchMute.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (buttonView.isPressed()) {
+                // Only update when user directly clicks the switch, not when programmatically changed
+                updateMuteStatus(isChecked);
+            }
         });
         
         binding.layoutBlockUser.setOnClickListener(v -> {
-            binding.switchBlock.toggle();
-            // Placeholder for block functionality
-            String status = binding.switchBlock.isChecked() ? "blocked" : "unblocked";
-            Toast.makeText(this, "User " + status, Toast.LENGTH_SHORT).show();
+            boolean newBlockStatus = !binding.switchBlock.isChecked();
+            binding.switchBlock.setChecked(newBlockStatus);
+            
+            // Update block status in Firebase
+            updateBlockStatus(newBlockStatus);
+        });
+        
+        binding.switchBlock.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (buttonView.isPressed()) {
+                // Only update when user directly clicks the switch, not when programmatically changed
+                updateBlockStatus(isChecked);
+            }
         });
         
         binding.layoutClearChat.setOnClickListener(v -> {
@@ -124,6 +168,54 @@ public class UserProfileActivity extends AppCompatActivity {
         
         binding.layoutReport.setOnClickListener(v -> {
             Toast.makeText(this, "Report user functionality will be implemented soon", Toast.LENGTH_SHORT).show();
+        });
+    }
+    
+    private void updateBlockStatus(boolean isBlocked) {
+        // Show loading while updating
+        showLoading(true);
+        
+        relationshipService.updateBlockStatus(userId, isBlocked, new UserRelationshipService.RelationshipOperationListener() {
+            @Override
+            public void onSuccess() {
+                showLoading(false);
+                // Show feedback to user
+                String message = isBlocked 
+                        ? "User blocked. They cannot message you, but can still see your messages." 
+                        : "User unblocked";
+                Toast.makeText(UserProfileActivity.this, message, Toast.LENGTH_LONG).show();
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                showLoading(false);
+                // Revert the switch if the operation failed
+                binding.switchBlock.setChecked(!isBlocked);
+                Toast.makeText(UserProfileActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+    
+    private void updateMuteStatus(boolean isMuted) {
+        // Show loading while updating
+        showLoading(true);
+        
+        relationshipService.updateMuteStatus(userId, isMuted, new UserRelationshipService.RelationshipOperationListener() {
+            @Override
+            public void onSuccess() {
+                showLoading(false);
+                // Show feedback to user
+                String message = isMuted ? "Notifications muted" : "Notifications unmuted";
+                Toast.makeText(UserProfileActivity.this, message, Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                showLoading(false);
+                // Revert the switch if the operation failed
+                binding.switchMute.setChecked(!isMuted);
+                Toast.makeText(UserProfileActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+            }
         });
     }
 }

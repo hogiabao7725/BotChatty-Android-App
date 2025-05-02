@@ -115,6 +115,27 @@
         app:layout_constraintTop_toBottomOf="@id/viewSupporter"
         android:translationZ="10dp"/>
 
+    <!-- Block Notification Banner -->
+    <LinearLayout
+        android:id="@+id/layoutBlockNotification"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFEBEE"
+        android:padding="8dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/textAvailability">
+        
+        <TextView
+            android:id="@+id/textBlockNotification"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="#D32F2F"
+            android:text="@string/you_are_blocked"
+            android:textSize="14sp" />
+    </LinearLayout>
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/chatRecyclerView"
         android:layout_width="match_parent"
@@ -127,7 +148,7 @@
         android:visibility="gone"
         app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
         app:layout_constraintBottom_toBottomOf="@id/viewBackground"
-        app:layout_constraintTop_toBottomOf="@+id/viewSupporter"/>
+        app:layout_constraintTop_toBottomOf="@+id/layoutBlockNotification"/>
 
     <ProgressBar
         android:id="@+id/progressBar"
@@ -170,7 +191,7 @@
         android:layout_marginRight="@dimen/_8sdp"
         android:layout_marginBottom="@dimen/_12sdp"
         android:background="@drawable/background_chat_input"
-        android:hint="Type a message"
+        android:hint="@string/type_a_message"
         android:imeOptions="actionDone"
         android:importantForAutofill="no"
         android:inputType="text"

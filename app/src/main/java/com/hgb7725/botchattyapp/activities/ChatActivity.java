@@ -9,6 +9,7 @@ import android.provider.MediaStore;
 import android.util.Base64;
 import android.view.View;
 import android.widget.Toast;
+import android.widget.TextView;
 
 import com.hgb7725.botchattyapp.R;
 import com.hgb7725.botchattyapp.adapters.ChatAdapter;
@@ -17,6 +18,7 @@ import com.hgb7725.botchattyapp.databinding.ActivityChatBinding;
 import com.hgb7725.botchattyapp.firebase.ChatFirebaseService;
 import com.hgb7725.botchattyapp.models.ChatMessage;
 import com.hgb7725.botchattyapp.models.User;
+import com.hgb7725.botchattyapp.utilities.BlockStatusChecker;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
@@ -36,7 +38,9 @@ public class ChatActivity extends BaseActivity {
     private PreferenceManager preferenceManager;
     private ChatFirebaseService chatFirebaseService;
     private CloudinaryService cloudinaryService;
+    private BlockStatusChecker blockStatusChecker;
     private Boolean isReceiverAvailable = false;
+    private Boolean isBlockedByReceiver = false;
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int PICK_FILE_REQUEST = 2;
     private static final int RECORD_AUDIO_REQUEST = 3;
@@ -51,6 +55,7 @@ public class ChatActivity extends BaseActivity {
         loadReceiverDetails();
         init();
         setupListeners();
+        checkBlockStatus();
 
         // Mark current conversation as read
         chatFirebaseService.markConversationAsRead(receiverUser.getId());
@@ -63,6 +68,7 @@ public class ChatActivity extends BaseActivity {
         // Initialize services
         chatFirebaseService = new ChatFirebaseService(preferenceManager);
         cloudinaryService = new CloudinaryService(this);
+        blockStatusChecker = new BlockStatusChecker(this, preferenceManager);
 
         chatAdapter = new ChatAdapter(
                 chatMessages,
@@ -70,6 +76,74 @@ public class ChatActivity extends BaseActivity {
                 preferenceManager.getString(Constants.KEY_USER_ID)
         );
         binding.chatRecyclerView.setAdapter(chatAdapter);
+    }
+
+    /**
+     * Check if either user has blocked the other
+     */
+    private void checkBlockStatus() {
+        blockStatusChecker.checkBlockStatus(receiverUser.getId(), new BlockStatusChecker.BlockCheckListener() {
+            @Override
+            public void onCheckComplete(boolean isBlocked, boolean isBlockedBy) {
+                isBlockedByReceiver = isBlockedBy;
+                updateUIBasedOnBlockStatus(isBlocked, isBlockedBy);
+            }
+        });
+    }
+
+    /**
+     * Update the UI based on block status
+     * @param isBlocked whether current user has blocked the other user
+     * @param isBlockedBy whether current user is blocked by the other user
+     */
+    private void updateUIBasedOnBlockStatus(boolean isBlocked, boolean isBlockedBy) {
+        // If either user has blocked the other, apply the same restrictions
+        boolean blockingActive = isBlocked || isBlockedBy;
+        
+        if (blockingActive) {
+            // Disable messaging functionality
+            binding.layoutSend.setEnabled(false);
+            binding.layoutSend.setAlpha(0.5f);
+            binding.inputMessage.setEnabled(false);
+            binding.imageCall.setEnabled(false);
+            binding.imageCall.setAlpha(0.5f);
+            binding.imageVideoCall.setEnabled(false);
+            binding.imageVideoCall.setAlpha(0.5f);
+            binding.imageAttachment.setEnabled(false);
+            binding.imageAttachment.setAlpha(0.5f);
+            
+            // Show block notification with appropriate message
+            binding.layoutBlockNotification.setVisibility(View.VISIBLE);
+            TextView textBlockNotification = binding.layoutBlockNotification.findViewById(R.id.textBlockNotification);
+            if (textBlockNotification != null) {
+                if (isBlockedBy && isBlocked) {
+                    // Both users have blocked each other
+                    binding.inputMessage.setHint(R.string.blocked_both_ways_hint);
+                    textBlockNotification.setText(R.string.blocked_both_ways);
+                } else if (isBlockedBy) {
+                    // Current user is blocked by receiver
+                    binding.inputMessage.setHint(R.string.blocked_by_user_hint);
+                    textBlockNotification.setText(R.string.you_are_blocked);
+                } else {
+                    // Current user has blocked receiver
+                    binding.inputMessage.setHint(R.string.you_blocked_hint);
+                    textBlockNotification.setText(R.string.you_blocked_this_user);
+                }
+            }
+        } else {
+            // No blocks, enable all functionality
+            binding.layoutSend.setEnabled(true);
+            binding.layoutSend.setAlpha(1.0f);
+            binding.inputMessage.setEnabled(true);
+            binding.inputMessage.setHint(R.string.type_a_message);
+            binding.imageCall.setEnabled(true);
+            binding.imageCall.setAlpha(1.0f);
+            binding.imageVideoCall.setEnabled(true);
+            binding.imageVideoCall.setAlpha(1.0f);
+            binding.imageAttachment.setEnabled(true);
+            binding.imageAttachment.setAlpha(1.0f);
+            binding.layoutBlockNotification.setVisibility(View.GONE);
+        }
     }
 
     private void setupListeners() {
@@ -124,13 +198,25 @@ public class ChatActivity extends BaseActivity {
     private void sendMessage() {
         String message = binding.inputMessage.getText().toString().trim();
         if (!message.isEmpty()) {
-            chatFirebaseService.sendTextMessage(
-                    receiverUser.getId(),
-                    receiverUser.getName(),
-                    receiverUser.getImage(),
-                    message
-            );
-            binding.inputMessage.setText(null);
+            // Check if user is allowed to send messages first
+            blockStatusChecker.canSendMessage(receiverUser.getId(), new BlockStatusChecker.MessagePermissionListener() {
+                @Override
+                public void onPermissionChecked(boolean canSend, String blockReason) {
+                    if (canSend) {
+                        chatFirebaseService.sendTextMessage(
+                                receiverUser.getId(),
+                                receiverUser.getName(),
+                                receiverUser.getImage(),
+                                message
+                        );
+                        binding.inputMessage.setText(null);
+                    } else {
+                        Toast.makeText(ChatActivity.this, blockReason, Toast.LENGTH_SHORT).show();
+                        // Update UI to reflect block status
+                        checkBlockStatus();
+                    }
+                }
+            });
         }
     }
 
@@ -230,72 +316,108 @@ public class ChatActivity extends BaseActivity {
     }
 
     private void handleImageUpload(Uri imageUri) {
-        cloudinaryService.uploadImage(imageUri, new CloudinaryService.UploadCallback() {
+        // Check if user is allowed to send images
+        blockStatusChecker.canSendMessage(receiverUser.getId(), new BlockStatusChecker.MessagePermissionListener() {
             @Override
-            public void onSuccess(String url, String fileName) {
-                chatFirebaseService.sendImageMessage(
-                        receiverUser.getId(),
-                        receiverUser.getName(),
-                        receiverUser.getImage(),
-                        url
-                );
-            }
+            public void onPermissionChecked(boolean canSend, String blockReason) {
+                if (canSend) {
+                    cloudinaryService.uploadImage(imageUri, new CloudinaryService.UploadCallback() {
+                        @Override
+                        public void onSuccess(String url, String fileName) {
+                            chatFirebaseService.sendImageMessage(
+                                    receiverUser.getId(),
+                                    receiverUser.getName(),
+                                    receiverUser.getImage(),
+                                    url
+                            );
+                        }
 
-            @Override
-            public void onError(String errorMessage) {
-                Toast.makeText(ChatActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                        @Override
+                        public void onError(String errorMessage) {
+                            Toast.makeText(ChatActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } else {
+                    Toast.makeText(ChatActivity.this, blockReason, Toast.LENGTH_SHORT).show();
+                    // Update UI to reflect block status
+                    checkBlockStatus();
+                }
             }
         });
     }
 
     private void handleFileUpload(Uri fileUri) {
-        cloudinaryService.uploadFile(fileUri, new CloudinaryService.UploadCallback() {
+        // Check if user is allowed to send files
+        blockStatusChecker.canSendMessage(receiverUser.getId(), new BlockStatusChecker.MessagePermissionListener() {
             @Override
-            public void onSuccess(String url, String fileName) {
-                chatFirebaseService.sendFileMessage(
-                        receiverUser.getId(),
-                        receiverUser.getName(),
-                        receiverUser.getImage(),
-                        url,
-                        fileName
-                );
-            }
+            public void onPermissionChecked(boolean canSend, String blockReason) {
+                if (canSend) {
+                    cloudinaryService.uploadFile(fileUri, new CloudinaryService.UploadCallback() {
+                        @Override
+                        public void onSuccess(String url, String fileName) {
+                            chatFirebaseService.sendFileMessage(
+                                    receiverUser.getId(),
+                                    receiverUser.getName(),
+                                    receiverUser.getImage(),
+                                    url,
+                                    fileName
+                            );
+                        }
 
-            @Override
-            public void onError(String errorMessage) {
-                Toast.makeText(ChatActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                        @Override
+                        public void onError(String errorMessage) {
+                            Toast.makeText(ChatActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } else {
+                    Toast.makeText(ChatActivity.this, blockReason, Toast.LENGTH_SHORT).show();
+                    // Update UI to reflect block status
+                    checkBlockStatus();
+                }
             }
         });
     }
 
     private void handleVideoUpload(Uri videoUri) {
-        // Add progress indicator or loading message
-        binding.progressBar.setVisibility(View.VISIBLE);
-        
-        cloudinaryService.uploadVideo(videoUri, new CloudinaryService.UploadCallback() {
+        // Check if user is allowed to send videos
+        blockStatusChecker.canSendMessage(receiverUser.getId(), new BlockStatusChecker.MessagePermissionListener() {
             @Override
-            public void onSuccess(String url, String fileNameWithDuration) {
-                // Format is "filename.mp4|duration"
-                String[] parts = fileNameWithDuration.split("\\|");
-                String fileName = parts[0];
-                String duration = parts.length > 1 ? parts[1] : "00:00";
-                
-                chatFirebaseService.sendVideoMessage(
-                        receiverUser.getId(),
-                        receiverUser.getName(),
-                        receiverUser.getImage(),
-                        url,
-                        fileName,
-                        duration
-                );
-                
-                binding.progressBar.setVisibility(View.GONE);
-            }
+            public void onPermissionChecked(boolean canSend, String blockReason) {
+                if (canSend) {
+                    // Add progress indicator or loading message
+                    binding.progressBar.setVisibility(View.VISIBLE);
+                    
+                    cloudinaryService.uploadVideo(videoUri, new CloudinaryService.UploadCallback() {
+                        @Override
+                        public void onSuccess(String url, String fileNameWithDuration) {
+                            // Format is "filename.mp4|duration"
+                            String[] parts = fileNameWithDuration.split("\\|");
+                            String fileName = parts[0];
+                            String duration = parts.length > 1 ? parts[1] : "00:00";
+                            
+                            chatFirebaseService.sendVideoMessage(
+                                    receiverUser.getId(),
+                                    receiverUser.getName(),
+                                    receiverUser.getImage(),
+                                    url,
+                                    fileName,
+                                    duration
+                            );
+                            
+                            binding.progressBar.setVisibility(View.GONE);
+                        }
 
-            @Override
-            public void onError(String errorMessage) {
-                binding.progressBar.setVisibility(View.GONE);
-                Toast.makeText(ChatActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                        @Override
+                        public void onError(String errorMessage) {
+                            binding.progressBar.setVisibility(View.GONE);
+                            Toast.makeText(ChatActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } else {
+                    Toast.makeText(ChatActivity.this, blockReason, Toast.LENGTH_SHORT).show();
+                    // Update UI to reflect block status
+                    checkBlockStatus();
+                }
             }
         });
     }
@@ -316,6 +438,9 @@ public class ChatActivity extends BaseActivity {
 
         // Mark conversation as read whenever resumed
         chatFirebaseService.markConversationAsRead(receiverUser.getId());
+        
+        // Refresh block status when returning to the chat
+        checkBlockStatus();
     }
 
     @Override

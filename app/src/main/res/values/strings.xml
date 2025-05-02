@@ -39,4 +39,13 @@
     <string name="call_connected">Connected</string>
     <string name="call_ended">Call ended</string>
     <string name="waiting_for_answer">Waiting for answer...</string>
+
+    <!-- Block User Functionality -->
+    <string name="blocked_by_user_hint">You cannot send messages to this user</string>
+    <string name="you_are_blocked">You have been blocked by this user</string>
+    <string name="you_blocked_this_user">You have blocked this user</string>
+    <string name="type_a_message">Type a message</string>
+    <string name="blocked_both_ways">Both users have blocked each other</string>
+    <string name="blocked_both_ways_hint">This conversation is blocked</string>
+    <string name="you_blocked_hint">You have blocked this conversation</string>
 </resources>

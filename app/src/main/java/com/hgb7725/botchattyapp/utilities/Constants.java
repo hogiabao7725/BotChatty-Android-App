@@ -30,4 +30,11 @@ public class Constants {
     public static final String KEY_ONLINE_STATUS_VISIBLE = "online_status_visible";
     public static final int AVAILABILITY_ONLINE = 1;
     public static final int AVAILABILITY_OFFLINE = 0;
+    
+    // User relationships constants
+    public static final String KEY_COLLECTION_USER_RELATIONSHIPS = "user_relationships";
+    public static final String KEY_OTHER_USER_ID = "otherUserId";
+    public static final String KEY_BLOCKED = "blocked";  // Changed from KEY_IS_BLOCKED to KEY_BLOCKED
+    public static final String KEY_MUTED = "muted";      // Changed from KEY_IS_MUTED to KEY_MUTED
+    public static final String KEY_LAST_UPDATED = "lastUpdated";
 }

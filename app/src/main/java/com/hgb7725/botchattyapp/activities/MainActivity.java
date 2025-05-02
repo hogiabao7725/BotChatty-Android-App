@@ -61,12 +61,16 @@ public class MainActivity extends BaseActivity implements ConversionListener {
     private void setListeners() {
         // Change from logout to opening settings
         binding.imageSettings.setOnClickListener(v -> navigateToSettings());
-        binding.fabNewChat.setOnClickListener(v ->
+        binding.fabNewChat.setOnClickListener(v -> 
                 startActivity(new Intent(getApplicationContext(), UsersActivity.class)));
     }
 
     private void navigateToSettings() {
         Intent intent = new Intent(getApplicationContext(), SettingsActivity.class);
+        String userId = preferenceManager.getString(Constants.KEY_USER_ID);
+        if (userId != null) {
+            intent.putExtra(Constants.KEY_USER_ID, userId);
+        }
         startActivity(intent);
     }
 
@@ -93,7 +97,7 @@ public class MainActivity extends BaseActivity implements ConversionListener {
                 }
                 
                 // Sort conversations by date
-                Collections.sort(conversationList, (obj1, obj2) ->
+                Collections.sort(conversationList, (obj1, obj2) -> 
                         obj2.getDateObject().compareTo(obj1.getDateObject()));
                 
                 // Update the adapter with new data
@@ -107,7 +111,7 @@ public class MainActivity extends BaseActivity implements ConversionListener {
             @Override
             public void onConversationsUpdated() {
                 // Sort conversations by date again after updates
-                Collections.sort(conversations, (obj1, obj2) ->
+                Collections.sort(conversations, (obj1, obj2) -> 
                         obj2.getDateObject().compareTo(obj1.getDateObject()));
                 conversationsAdapter.notifyDataSetChanged();
             }
@@ -136,7 +140,7 @@ public class MainActivity extends BaseActivity implements ConversionListener {
             conversationService.refreshConversations();
             
             // Also sort the current list
-            Collections.sort(conversations, (obj1, obj2) ->
+            Collections.sort(conversations, (obj1, obj2) -> 
                     obj2.getDateObject().compareTo(obj1.getDateObject()));
             conversationsAdapter.notifyDataSetChanged();
         }

@@ -2,6 +2,7 @@ package com.hgb7725.botchattyapp.firebase;
 
 import android.content.Context;
 import android.content.Intent;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.google.firebase.firestore.DocumentReference;
@@ -21,6 +22,7 @@ public class UserFirebaseService {
     private FirebaseFirestore database = FirebaseFirestore.getInstance();
     private PreferenceManager preferenceManager;
     private Context context;
+    private static final String TAG = "UserFirebaseService";
     
     public interface SignOutListener {
         void onSignOutSuccess();
@@ -29,6 +31,11 @@ public class UserFirebaseService {
     
     public interface UserProfileListener {
         void onUserDataLoaded(User user);
+        void onFailure(String errorMessage);
+    }
+    
+    public interface OnlineStatusListener {
+        void onSuccess();
         void onFailure(String errorMessage);
     }
     
@@ -57,24 +64,99 @@ public class UserFirebaseService {
                 .addOnFailureListener(e -> showToast("Unable to update token"));
     }
 
+    /**
+     * Signs out the user and updates offline status
+     * @param listener Interface callback to notify results
+     */
     public void signOut(SignOutListener listener) {
-        DocumentReference documentReference = database.collection(Constants.KEY_COLLECTION_USERS).document(
-                preferenceManager.getString(Constants.KEY_USER_ID)
-        );
-        HashMap<String, Object> updates = new HashMap<>();
-        updates.put(Constants.KEY_FCM_TOKEN, FieldValue.delete());
-        documentReference.update(updates)
-                .addOnSuccessListener(unused -> {
-                    preferenceManager.clear();
-                    if (listener != null) {
-                        listener.onSignOutSuccess();
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    if (listener != null) {
-                        listener.onSignOutFailure("Unable to Sign Out");
-                    }
-                });
+        try {
+            String userId = preferenceManager.getString(Constants.KEY_USER_ID);
+            if (userId == null) {
+                // If unable to get user ID, clear preferences and proceed to sign-in screen
+                preferenceManager.clear();
+                if (listener != null) {
+                    listener.onSignOutSuccess();
+                }
+                return;
+            }
+            
+            DocumentReference documentReference = database.collection(Constants.KEY_COLLECTION_USERS)
+                    .document(userId);
+            HashMap<String, Object> updates = new HashMap<>();
+            // Set user as offline when signing out
+            updates.put(Constants.KEY_AVAILABILITY, Constants.AVAILABILITY_OFFLINE);
+            // Delete FCM token
+            updates.put(Constants.KEY_FCM_TOKEN, FieldValue.delete());
+            
+            documentReference.update(updates)
+                    .addOnSuccessListener(unused -> {
+                        preferenceManager.clear();
+                        if (listener != null) {
+                            listener.onSignOutSuccess();
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Firebase error signing out: " + e.getMessage());
+                        // Even if Firebase update fails, still sign out locally
+                        preferenceManager.clear();
+                        if (listener != null) {
+                            listener.onSignOutFailure("Unable to update status but signed out locally");
+                        }
+                    });
+        } catch (Exception e) {
+            Log.e(TAG, "Error in signOut: " + e.getMessage());
+            // If any exception occurs, still try to sign out
+            preferenceManager.clear();
+            if (listener != null) {
+                listener.onSignOutSuccess();
+            }
+        }
+    }
+    
+    /**
+     * Updates the visibility of user's online status
+     * @param isVisible Whether to display online status
+     * @param listener Interface callback to notify results
+     */
+    public void updateOnlineStatusVisibility(boolean isVisible, OnlineStatusListener listener) {
+        try {
+            String userId = preferenceManager.getString(Constants.KEY_USER_ID);
+            if (userId == null) {
+                if (listener != null) {
+                    listener.onFailure("User ID is null when updating online status");
+                }
+                return;
+            }
+            
+            DocumentReference documentReference = database.collection(Constants.KEY_COLLECTION_USERS)
+                    .document(userId);
+            HashMap<String, Object> updates = new HashMap<>();
+            // Update display settings
+            updates.put(Constants.KEY_ONLINE_STATUS_VISIBLE, isVisible);
+            
+            // Also update availability status based on display settings
+            // If display is turned off, set availability to 0 (offline)
+            // If display is turned on, set availability to 1 (online)
+            updates.put(Constants.KEY_AVAILABILITY, isVisible ? Constants.AVAILABILITY_ONLINE : Constants.AVAILABILITY_OFFLINE);
+            
+            documentReference.update(updates)
+                    .addOnSuccessListener(aVoid -> {
+                        if (listener != null) {
+                            listener.onSuccess();
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Firebase error updating online status: " + e.getMessage());
+                        if (listener != null) {
+                            listener.onFailure("Unable to update online status visibility");
+                        }
+                    });
+        } catch (Exception e) {
+            Log.e(TAG, "Error in updateOnlineStatusVisibility: " + e.getMessage());
+            if (listener != null) {
+                listener.onFailure("An error occurred: " + e.getMessage());
+            }
+        }
     }
     
     /**
@@ -112,6 +194,43 @@ public class UserFirebaseService {
             getUserById(currentUserId, listener);
         } else {
             listener.onFailure("No user is currently logged in");
+        }
+    }
+    
+    /**
+     * Deletes user account and all related data
+     * @param listener Interface callback to notify results
+     */
+    public void deleteAccount(SignOutListener listener) {
+        try {
+            String userId = preferenceManager.getString(Constants.KEY_USER_ID);
+            if (userId == null) {
+                if (listener != null) {
+                    listener.onSignOutFailure("Cannot delete account: User ID is null");
+                }
+                return;
+            }
+            
+            // Delete account from Firestore
+            database.collection(Constants.KEY_COLLECTION_USERS)
+                    .document(userId)
+                    .delete()
+                    .addOnSuccessListener(aVoid -> {
+                        // Clear local data and notify success
+                        preferenceManager.clear();
+                        if (listener != null) {
+                            listener.onSignOutSuccess();
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        if (listener != null) {
+                            listener.onSignOutFailure("Failed to delete account: " + e.getMessage());
+                        }
+                    });
+        } catch (Exception e) {
+            if (listener != null) {
+                listener.onSignOutFailure("Error while deleting account: " + e.getMessage());
+            }
         }
     }
     

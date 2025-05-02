@@ -22,6 +22,8 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.hgb7725.botchattyapp.R;
 import com.hgb7725.botchattyapp.databinding.ActivitySettingsBinding;
+import com.hgb7725.botchattyapp.firebase.UserFirebaseService;
+import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 import com.makeramen.roundedimageview.RoundedImageView;
@@ -39,6 +41,7 @@ public class SettingsActivity extends BaseActivity {
     private TextView textEmail;
     private RoundedImageView imageProfile;
     private PreferenceManager preferenceManager;
+    private UserFirebaseService userService;
     private static final String KEY_NOTIFICATIONS_ENABLED = "notifications_enabled";
     private static final String TAG = "SettingsActivity";
 
@@ -48,6 +51,7 @@ public class SettingsActivity extends BaseActivity {
         setContentView(R.layout.activity_settings);
         
         preferenceManager = new PreferenceManager(getApplicationContext());
+        userService = new UserFirebaseService(getApplicationContext(), preferenceManager);
         
         initViews();
         setListeners();
@@ -107,9 +111,19 @@ public class SettingsActivity extends BaseActivity {
             try {
                 // Save online status visibility preference
                 preferenceManager.putBoolean(Constants.KEY_ONLINE_STATUS_VISIBLE, isChecked);
-                // Update the online status in Firestore
-                updateOnlineStatusVisibility(isChecked);
-                showToast(isChecked ? "Online status visible" : "Online status hidden");
+                // Update the online status in Firestore using UserFirebaseService
+                userService.updateOnlineStatusVisibility(isChecked, new UserFirebaseService.OnlineStatusListener() {
+                    @Override
+                    public void onSuccess() {
+                        showToast(isChecked ? "Online status visible" : "Online status hidden");
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage) {
+                        Log.e(TAG, "Error updating online status: " + errorMessage);
+                        showToast("Error updating status. Please try again.");
+                    }
+                });
             } catch (Exception e) {
                 Log.e(TAG, "Error updating online status: " + e.getMessage());
                 showToast("Error updating status. Please try again.");
@@ -120,7 +134,14 @@ public class SettingsActivity extends BaseActivity {
         buttonLogout.setOnClickListener(v -> signOut());
         
         buttonChangePassword.setOnClickListener(v -> {
-            showToast("Change Password feature coming soon!");
+            String email = textEmail.getText().toString().trim();
+            if (email != null && !email.isEmpty()) {
+                Intent intent = new Intent(SettingsActivity.this, ResetPasswordActivity.class);
+                intent.putExtra("email", email);
+                startActivity(intent);
+            } else {
+                showToast("Unable to retrieve your email. Please sign in again.");
+            }
         });
         
         buttonDeleteAccount.setOnClickListener(v -> {
@@ -163,8 +184,67 @@ public class SettingsActivity extends BaseActivity {
     }
     
     private void loadUserData() {
-        try {
-            // Set user name
+        // Get the user ID from intent
+        String userId = getIntent().getStringExtra(Constants.KEY_USER_ID);
+        if (userId == null) {
+            // Fallback to preference manager if not passed in intent
+            userId = preferenceManager.getString(Constants.KEY_USER_ID);
+        }
+        
+        if (userId != null) {
+            // Show loading state
+            showLoading(true);
+            
+            // Use UserFirebaseService to get user data
+            userService.getUserById(userId, new UserFirebaseService.UserProfileListener() {
+                @Override
+                public void onUserDataLoaded(User user) {
+                    // Update UI with user data
+                    if (user != null) {
+                        textUsername.setText(user.getName());
+                        textEmail.setText(user.getEmail());
+                        
+                        // Load profile image if available
+                        String imageString = user.getImage();
+                        if (imageString != null) {
+                            byte[] bytes = Base64.decode(imageString, Base64.DEFAULT);
+                            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                            imageProfile.setImageBitmap(bitmap);
+                        }
+                    }
+                    showLoading(false);
+                }
+
+                @Override
+                public void onFailure(String errorMessage) {
+                    showLoading(false);
+                    showToast("Failed to load user data: " + errorMessage);
+                    
+                    // Fallback to preference manager data
+                    String name = preferenceManager.getString(Constants.KEY_NAME);
+                    if (name != null) {
+                        textUsername.setText(name);
+                    } else {
+                        textUsername.setText("User");
+                    }
+                    
+                    String email = preferenceManager.getString(Constants.KEY_EMAIL);
+                    if (email != null) {
+                        textEmail.setText(email);
+                    } else {
+                        textEmail.setText("Email not available");
+                    }
+                    
+                    String imageString = preferenceManager.getString(Constants.KEY_IMAGE);
+                    if (imageString != null) {
+                        byte[] bytes = Base64.decode(imageString, Base64.DEFAULT);
+                        Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                        imageProfile.setImageBitmap(bitmap);
+                    }
+                }
+            });
+        } else {
+            // If user ID is not available anywhere, use fallback data
             String name = preferenceManager.getString(Constants.KEY_NAME);
             if (name != null) {
                 textUsername.setText(name);
@@ -172,55 +252,40 @@ public class SettingsActivity extends BaseActivity {
                 textUsername.setText("User");
             }
             
-            // Set user email
             String email = preferenceManager.getString(Constants.KEY_EMAIL);
             if (email != null) {
                 textEmail.setText(email);
             } else {
-                textEmail.setText("No email available");
+                textEmail.setText("Email not available");
             }
             
-            // Set profile image
             String imageString = preferenceManager.getString(Constants.KEY_IMAGE);
             if (imageString != null) {
                 byte[] bytes = Base64.decode(imageString, Base64.DEFAULT);
                 Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                 imageProfile.setImageBitmap(bitmap);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading user details: " + e.getMessage());
-            // Don't crash if we can't load user details
         }
     }
     
+    private void showLoading(boolean isLoading) {
+        // If you have a progress bar, show/hide it based on loading state
+        // For now, we'll skip this since we don't know if there's a progress bar
+    }
+    
     private void updateOnlineStatusVisibility(boolean isVisible) {
-        try {
-            FirebaseFirestore database = FirebaseFirestore.getInstance();
-            String userId = preferenceManager.getString(Constants.KEY_USER_ID);
-            if (userId == null) {
-                Log.e(TAG, "User ID is null when updating online status");
-                return;
+        userService.updateOnlineStatusVisibility(isVisible, new UserFirebaseService.OnlineStatusListener() {
+            @Override
+            public void onSuccess() {
+                // Status updated successfully
             }
-            
-            DocumentReference documentReference = database.collection(Constants.KEY_COLLECTION_USERS)
-                    .document(userId);
-            HashMap<String, Object> updates = new HashMap<>();
-            // Update the visibility setting
-            updates.put(Constants.KEY_ONLINE_STATUS_VISIBLE, isVisible);
-            
-            // Also immediately update the availability status based on visibility setting
-            // If visibility is turned off, set availability to 0 (offline)
-            // If visibility is turned on, set availability to 1 (online)
-            updates.put(Constants.KEY_AVAILABILITY, isVisible ? Constants.AVAILABILITY_ONLINE : Constants.AVAILABILITY_OFFLINE);
-            
-            documentReference.update(updates)
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Firebase error updating online status: " + e.getMessage());
-                        showToast("Unable to update online status visibility");
-                    });
-        } catch (Exception e) {
-            Log.e(TAG, "Error in updateOnlineStatusVisibility: " + e.getMessage());
-        }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                Log.e(TAG, "Error updating online status: " + errorMessage);
+                showToast("Unable to update online status visibility");
+            }
+        });
     }
     
     private void showToast(String message) {
@@ -229,45 +294,21 @@ public class SettingsActivity extends BaseActivity {
     
     private void signOut() {
         showToast("Signing out...");
-        try {
-            FirebaseFirestore database = FirebaseFirestore.getInstance();
-            String userId = preferenceManager.getString(Constants.KEY_USER_ID);
-            if (userId == null) {
-                // If we can't get the user ID, just clear preferences and go to sign in
-                preferenceManager.clear();
+        userService.signOut(new UserFirebaseService.SignOutListener() {
+            @Override
+            public void onSignOutSuccess() {
                 startActivity(new Intent(getApplicationContext(), SignInActivity.class));
                 finish();
-                return;
             }
-            
-            DocumentReference documentReference = database.collection(Constants.KEY_COLLECTION_USERS)
-                    .document(userId);
-            HashMap<String, Object> updates = new HashMap<>();
-            // Set user as offline when signing out
-            updates.put(Constants.KEY_AVAILABILITY, Constants.AVAILABILITY_OFFLINE);
-            // Delete FCM token
-            updates.put(Constants.KEY_FCM_TOKEN, FieldValue.delete());
-            
-            documentReference.update(updates)
-                    .addOnSuccessListener(unused -> {
-                        preferenceManager.clear();
-                        startActivity(new Intent(getApplicationContext(), SignInActivity.class));
-                        finish();
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Firebase error signing out: " + e.getMessage());
-                        // Even if Firebase update fails, still sign out locally
-                        preferenceManager.clear();
-                        startActivity(new Intent(getApplicationContext(), SignInActivity.class));
-                        finish();
-                    });
-        } catch (Exception e) {
-            Log.e(TAG, "Error in signOut: " + e.getMessage());
-            // If any exception occurs, still try to sign out
-            preferenceManager.clear();
-            startActivity(new Intent(getApplicationContext(), SignInActivity.class));
-            finish();
-        }
+
+            @Override
+            public void onSignOutFailure(String errorMessage) {
+                Log.e(TAG, "Error signing out: " + errorMessage);
+                // Even if there's an error, try to sign out locally
+                startActivity(new Intent(getApplicationContext(), SignInActivity.class));
+                finish();
+            }
+        });
     }
     
     private void showDeleteAccountConfirmation() {
@@ -276,9 +317,20 @@ public class SettingsActivity extends BaseActivity {
         builder.setTitle("Delete Account");
         builder.setMessage("Are you sure you want to delete your account? This action cannot be undone.");
         builder.setPositiveButton("Delete", (dialog, which) -> {
-            // Handle account deletion logic here
-            Toast.makeText(SettingsActivity.this, "Account deletion initiated", Toast.LENGTH_SHORT).show();
-            // You would implement actual account deletion logic here
+            // Use UserFirebaseService to handle account deletion
+            userService.deleteAccount(new UserFirebaseService.SignOutListener() {
+                @Override
+                public void onSignOutSuccess() {
+                    showToast("Account successfully deleted");
+                    startActivity(new Intent(getApplicationContext(), SignInActivity.class));
+                    finish();
+                }
+
+                @Override
+                public void onSignOutFailure(String errorMessage) {
+                    showToast("Failed to delete account: " + errorMessage);
+                }
+            });
         });
         builder.setNegativeButton("Cancel", null);
         builder.show();

@@ -312,27 +312,69 @@ public class SettingsActivity extends BaseActivity {
     }
     
     private void showDeleteAccountConfirmation() {
-        // Show a confirmation dialog before deleting account
+        // Show a confirmation dialog with additional warning
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle("Delete Account");
-        builder.setMessage("Are you sure you want to delete your account? This action cannot be undone.");
+        builder.setMessage("Are you sure you want to delete your account? This will permanently delete:\n\n" +
+                "• Your user profile\n" +
+                "• All your conversations\n" +
+                "• All messages you've sent or received\n\n" +
+                "This action cannot be undone.");
+        
         builder.setPositiveButton("Delete", (dialog, which) -> {
-            // Use UserFirebaseService to handle account deletion
-            userService.deleteAccount(new UserFirebaseService.SignOutListener() {
-                @Override
-                public void onSignOutSuccess() {
-                    showToast("Account successfully deleted");
-                    startActivity(new Intent(getApplicationContext(), SignInActivity.class));
-                    finish();
-                }
+            // Show a second confirmation dialog requiring the user to type "DELETE"
+            final android.app.AlertDialog.Builder confirmBuilder = new android.app.AlertDialog.Builder(this);
+            confirmBuilder.setTitle("Confirm Deletion");
+            confirmBuilder.setMessage("Type DELETE (all caps) to confirm account deletion:");
 
-                @Override
-                public void onSignOutFailure(String errorMessage) {
-                    showToast("Failed to delete account: " + errorMessage);
+            // Add an input field
+            final android.widget.EditText input = new android.widget.EditText(this);
+            confirmBuilder.setView(input);
+
+            confirmBuilder.setPositiveButton("Confirm", (confirmDialog, confirmWhich) -> {
+                // Check if user typed DELETE
+                String confirmText = input.getText().toString();
+                if (confirmText.equals("DELETE")) {
+                    // Show a loading dialog while deletion is in progress
+                    android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+                    progressDialog.setMessage("Deleting account...");
+                    progressDialog.setCancelable(false);
+                    progressDialog.show();
+
+                    // Use UserFirebaseService to handle account deletion
+                    userService.deleteAccount(new UserFirebaseService.SignOutListener() {
+                        @Override
+                        public void onSignOutSuccess() {
+                            // Dismiss the loading dialog
+                            progressDialog.dismiss();
+                            showToast("Account successfully deleted");
+                            startActivity(new Intent(getApplicationContext(), SignInActivity.class));
+                            finish();
+                        }
+
+                        @Override
+                        public void onSignOutFailure(String errorMessage) {
+                            // Dismiss the loading dialog
+                            progressDialog.dismiss();
+                            showToast("Failed to delete account: " + errorMessage);
+                        }
+                    });
+                } else {
+                    showToast("Account deletion cancelled. Text did not match.");
                 }
             });
+
+            confirmBuilder.setNegativeButton("Cancel", (confirmDialog, confirmWhich) -> {
+                showToast("Account deletion cancelled");
+            });
+
+            confirmBuilder.show();
         });
-        builder.setNegativeButton("Cancel", null);
+        
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            showToast("Account deletion cancelled");
+        });
+        
         builder.show();
     }
 }

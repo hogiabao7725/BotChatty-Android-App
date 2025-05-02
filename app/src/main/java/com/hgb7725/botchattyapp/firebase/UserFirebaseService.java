@@ -211,23 +211,93 @@ public class UserFirebaseService {
                 return;
             }
             
-            // Delete account from Firestore
-            database.collection(Constants.KEY_COLLECTION_USERS)
-                    .document(userId)
-                    .delete()
-                    .addOnSuccessListener(aVoid -> {
-                        // Clear local data and notify success
-                        preferenceManager.clear();
-                        if (listener != null) {
-                            listener.onSignOutSuccess();
+            // Delete all chat messages where user is sender or receiver
+            database.collection(Constants.KEY_COLLECTION_CHAT)
+                    .whereEqualTo(Constants.KEY_SENDER_ID, userId)
+                    .get()
+                    .addOnSuccessListener(senderChats -> {
+                        // Delete each message sent by the user
+                        for (DocumentSnapshot doc : senderChats.getDocuments()) {
+                            doc.getReference().delete();
                         }
+                        
+                        // Delete all messages received by user
+                        database.collection(Constants.KEY_COLLECTION_CHAT)
+                                .whereEqualTo(Constants.KEY_RECEIVER_ID, userId)
+                                .get()
+                                .addOnSuccessListener(receiverChats -> {
+                                    // Delete each message received by the user
+                                    for (DocumentSnapshot doc : receiverChats.getDocuments()) {
+                                        doc.getReference().delete();
+                                    }
+                                    
+                                    // Delete conversations where user is sender
+                                    database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                                            .whereEqualTo(Constants.KEY_SENDER_ID, userId)
+                                            .get()
+                                            .addOnSuccessListener(senderConversations -> {
+                                                // Delete each conversation started by the user
+                                                for (DocumentSnapshot doc : senderConversations.getDocuments()) {
+                                                    doc.getReference().delete();
+                                                }
+                                                
+                                                // Delete conversations where user is receiver
+                                                database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                                                        .whereEqualTo(Constants.KEY_RECEIVER_ID, userId)
+                                                        .get()
+                                                        .addOnSuccessListener(receiverConversations -> {
+                                                            // Delete each conversation where user is the receiver
+                                                            for (DocumentSnapshot doc : receiverConversations.getDocuments()) {
+                                                                doc.getReference().delete();
+                                                            }
+                                                            
+                                                            // Finally, delete the user account
+                                                            database.collection(Constants.KEY_COLLECTION_USERS)
+                                                                    .document(userId)
+                                                                    .delete()
+                                                                    .addOnSuccessListener(aVoid -> {
+                                                                        // Clear local data and notify success
+                                                                        preferenceManager.clear();
+                                                                        if (listener != null) {
+                                                                            listener.onSignOutSuccess();
+                                                                        }
+                                                                    })
+                                                                    .addOnFailureListener(e -> {
+                                                                        Log.e(TAG, "Error deleting user: " + e.getMessage());
+                                                                        if (listener != null) {
+                                                                            listener.onSignOutFailure("Failed to delete account: " + e.getMessage());
+                                                                        }
+                                                                    });
+                                                        })
+                                                        .addOnFailureListener(e -> {
+                                                            Log.e(TAG, "Error deleting receiver conversations: " + e.getMessage());
+                                                            if (listener != null) {
+                                                                listener.onSignOutFailure("Failed to clean up conversations: " + e.getMessage());
+                                                            }
+                                                        });
+                                            })
+                                            .addOnFailureListener(e -> {
+                                                Log.e(TAG, "Error deleting sender conversations: " + e.getMessage());
+                                                if (listener != null) {
+                                                    listener.onSignOutFailure("Failed to clean up conversations: " + e.getMessage());
+                                                }
+                                            });
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Error deleting receiver messages: " + e.getMessage());
+                                    if (listener != null) {
+                                        listener.onSignOutFailure("Failed to clean up messages: " + e.getMessage());
+                                    }
+                                });
                     })
                     .addOnFailureListener(e -> {
+                        Log.e(TAG, "Error deleting sender messages: " + e.getMessage());
                         if (listener != null) {
-                            listener.onSignOutFailure("Failed to delete account: " + e.getMessage());
+                            listener.onSignOutFailure("Failed to clean up messages: " + e.getMessage());
                         }
                     });
         } catch (Exception e) {
+            Log.e(TAG, "Error in deleteAccount: " + e.getMessage());
             if (listener != null) {
                 listener.onSignOutFailure("Error while deleting account: " + e.getMessage());
             }

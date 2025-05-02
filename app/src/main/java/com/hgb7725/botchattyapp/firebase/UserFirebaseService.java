@@ -5,10 +5,12 @@ import android.content.Intent;
 import android.widget.Toast;
 
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.hgb7725.botchattyapp.activities.SignInActivity;
+import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
@@ -23,6 +25,11 @@ public class UserFirebaseService {
     public interface SignOutListener {
         void onSignOutSuccess();
         void onSignOutFailure(String errorMessage);
+    }
+    
+    public interface UserProfileListener {
+        void onUserDataLoaded(User user);
+        void onFailure(String errorMessage);
     }
     
     public UserFirebaseService(Context context, PreferenceManager preferenceManager) {
@@ -68,6 +75,44 @@ public class UserFirebaseService {
                         listener.onSignOutFailure("Unable to Sign Out");
                     }
                 });
+    }
+    
+    /**
+     * Get user profile data by user ID
+     */
+    public void getUserById(String userId, UserProfileListener listener) {
+        database.collection(Constants.KEY_COLLECTION_USERS)
+                .document(userId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        User user = new User();
+                        user.setId(documentSnapshot.getId());
+                        user.setName(documentSnapshot.getString(Constants.KEY_NAME));
+                        user.setEmail(documentSnapshot.getString(Constants.KEY_EMAIL));
+                        user.setImage(documentSnapshot.getString(Constants.KEY_IMAGE));
+                        user.setToken(documentSnapshot.getString(Constants.KEY_FCM_TOKEN));
+                        
+                        listener.onUserDataLoaded(user);
+                    } else {
+                        listener.onFailure("User not found");
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    listener.onFailure("Failed to get user data: " + e.getMessage());
+                });
+    }
+    
+    /**
+     * Get current logged-in user profile
+     */
+    public void getCurrentUser(UserProfileListener listener) {
+        String currentUserId = preferenceManager.getString(Constants.KEY_USER_ID);
+        if (currentUserId != null) {
+            getUserById(currentUserId, listener);
+        } else {
+            listener.onFailure("No user is currently logged in");
+        }
     }
     
     private void showToast(String message) {

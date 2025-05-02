@@ -148,6 +148,13 @@ public class ChatActivity extends BaseActivity {
         binding.imageBack.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         binding.layoutSend.setOnClickListener(v -> sendMessage());
 
+        // Add info icon click listener to open user profile - passing only the user ID
+        binding.imageInfo.setOnClickListener(v -> {
+            Intent intent = new Intent(getApplicationContext(), UserProfileActivity.class);
+            intent.putExtra(Constants.KEY_USER_ID, receiverUser.getId());
+            startActivity(intent);
+        });
+
         // Add call button click listeners
         binding.imageCall.setOnClickListener(v -> {
             // Start voice call

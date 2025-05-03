@@ -6,6 +6,7 @@ import android.util.Log;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.hgb7725.botchattyapp.models.FileItem;
 import com.hgb7725.botchattyapp.models.MediaItem;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
@@ -32,6 +33,14 @@ public class MediaFirebaseService {
      */
     public interface MediaFetchListener {
         void onMediaFetched(List<MediaItem> mediaItems);
+        void onError(String errorMessage);
+    }
+    
+    /**
+     * Interface for file fetch listener
+     */
+    public interface FileFetchListener {
+        void onFilesFetched(List<FileItem> fileItems);
         void onError(String errorMessage);
     }
 
@@ -123,6 +132,91 @@ public class MediaFirebaseService {
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Error getting media preview: ", e);
                     listener.onError("Failed to load shared media: " + e.getMessage());
+                });
+    }
+    
+    /**
+     * Fetches all shared files between current user and specified user
+     */
+    public void fetchSharedFiles(String otherUserId, FileFetchListener listener) {
+        List<FileItem> fileItems = new ArrayList<>();
+        String currentUserId = preferenceManager.getString(Constants.KEY_USER_ID);
+        
+        // Query for file messages
+        database.collection(Constants.KEY_COLLECTION_CHAT)
+                .whereEqualTo("type", "file")
+                .orderBy(Constants.KEY_TIMESTAMP, Query.Direction.DESCENDING)
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        for (QueryDocumentSnapshot document : task.getResult()) {
+                            String senderId = document.getString(Constants.KEY_SENDER_ID);
+                            String receiverId = document.getString(Constants.KEY_RECEIVER_ID);
+                            
+                            // Check if this message belongs to the conversation between these users
+                            if ((senderId.equals(currentUserId) && receiverId.equals(otherUserId)) ||
+                                (senderId.equals(otherUserId) && receiverId.equals(currentUserId))) {
+                                
+                                String fileName = document.getString("fileName");
+                                String fileUrl = document.getString(Constants.KEY_MESSAGE);
+                                String timestamp = document.getDate(Constants.KEY_TIMESTAMP).toString();
+                                
+                                FileItem fileItem = new FileItem(fileUrl, fileName, timestamp, senderId);
+                                fileItems.add(fileItem);
+                            }
+                        }
+                        listener.onFilesFetched(fileItems);
+                    } else {
+                        Log.e(TAG, "Error getting files: ", task.getException());
+                        listener.onError("Failed to load shared files");
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error getting files: ", e);
+                    listener.onError("Failed to load shared files: " + e.getMessage());
+                });
+    }
+    
+    /**
+     * Fetches limited number of file items for preview
+     */
+    public void fetchFilesPreview(String otherUserId, int limit, FileFetchListener listener) {
+        List<FileItem> fileItems = new ArrayList<>();
+        String currentUserId = preferenceManager.getString(Constants.KEY_USER_ID);
+        
+        // Query for file messages with limit
+        database.collection(Constants.KEY_COLLECTION_CHAT)
+                .whereEqualTo("type", "file")
+                .orderBy(Constants.KEY_TIMESTAMP, Query.Direction.DESCENDING)
+                .limit(limit)
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        for (QueryDocumentSnapshot document : task.getResult()) {
+                            String senderId = document.getString(Constants.KEY_SENDER_ID);
+                            String receiverId = document.getString(Constants.KEY_RECEIVER_ID);
+                            
+                            // Check if this message belongs to the conversation between these users
+                            if ((senderId.equals(currentUserId) && receiverId.equals(otherUserId)) ||
+                                (senderId.equals(otherUserId) && receiverId.equals(currentUserId))) {
+                                
+                                String fileName = document.getString("fileName");
+                                String fileUrl = document.getString(Constants.KEY_MESSAGE);
+                                String timestamp = document.getDate(Constants.KEY_TIMESTAMP).toString();
+                                
+                                FileItem fileItem = new FileItem(fileUrl, fileName, timestamp, senderId);
+                                fileItems.add(fileItem);
+                            }
+                        }
+                        listener.onFilesFetched(fileItems);
+                    } else {
+                        Log.e(TAG, "Error getting file preview: ", task.getException());
+                        listener.onError("Failed to load shared files");
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error getting file preview: ", e);
+                    listener.onError("Failed to load shared files: " + e.getMessage());
                 });
     }
 }

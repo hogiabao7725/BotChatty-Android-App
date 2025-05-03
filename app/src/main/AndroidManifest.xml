@@ -41,6 +41,12 @@
             android:exported="false"
             android:theme="@style/Base.Theme.BotChattyApp" />
             
+        <!-- Shared Files Activity -->
+        <activity
+            android:name=".activities.SharedFilesActivity"
+            android:exported="false"
+            android:theme="@style/Base.Theme.BotChattyApp" />
+            
         <!-- Privacy Policy Activity -->
         <activity
             android:name=".activities.PrivacyPolicyActivity"

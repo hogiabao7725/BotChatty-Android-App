@@ -8,20 +8,26 @@ import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.hgb7725.botchattyapp.R;
+import com.hgb7725.botchattyapp.adapters.FileItemAdapter;
 import com.hgb7725.botchattyapp.adapters.MediaPreviewAdapter;
 import com.hgb7725.botchattyapp.databinding.ActivityUserProfileBinding;
 import com.hgb7725.botchattyapp.firebase.MediaFirebaseService;
 import com.hgb7725.botchattyapp.firebase.UserFirebaseService;
 import com.hgb7725.botchattyapp.firebase.UserRelationshipService;
+import com.hgb7725.botchattyapp.models.FileItem;
 import com.hgb7725.botchattyapp.models.MediaItem;
 import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.BlockStatusChecker;
 import com.hgb7725.botchattyapp.utilities.Constants;
+import com.hgb7725.botchattyapp.utilities.FileUtils;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
 import java.util.ArrayList;
@@ -39,6 +45,7 @@ public class UserProfileActivity extends AppCompatActivity {
     private String userId;
     private static final String TAG = "UserProfileActivity";
     private static final int MAX_PREVIEW_MEDIA = 4;
+    private static final int MAX_PREVIEW_FILES = 3;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,6 +70,7 @@ public class UserProfileActivity extends AppCompatActivity {
             loadRelationshipStatus();
             loadNickname();
             loadSharedMedia();
+            loadSharedFiles(); // Add this line to load shared files
         } else {
             Toast.makeText(this, "User ID not available", Toast.LENGTH_SHORT).show();
             finish();
@@ -182,6 +190,68 @@ public class UserProfileActivity extends AppCompatActivity {
         });
     }
     
+    private void loadSharedFiles() {
+        // Load a preview of shared files
+        mediaFirebaseService.fetchFilesPreview(userId, MAX_PREVIEW_FILES, new MediaFirebaseService.FileFetchListener() {
+            @Override
+            public void onFilesFetched(List<FileItem> fileItems) {
+                if (fileItems.isEmpty()) {
+                    // Hide the shared files section if there are no files
+                    binding.sharedFilesLabel.setVisibility(View.GONE);
+                    binding.viewAllFiles.setVisibility(View.GONE);
+                    binding.containerSharedFiles.setVisibility(View.GONE);
+                } else {
+                    // Show the shared files section
+                    binding.sharedFilesLabel.setVisibility(View.VISIBLE);
+                    binding.viewAllFiles.setVisibility(View.VISIBLE);
+                    binding.containerSharedFiles.setVisibility(View.VISIBLE);
+                    
+                    // Clear existing views in the container
+                    binding.containerSharedFiles.removeAllViews();
+                    
+                    // Add file items to the container
+                    for (int i = 0; i < Math.min(fileItems.size(), MAX_PREVIEW_FILES); i++) {
+                        FileItem fileItem = fileItems.get(i);
+                        View fileItemView = getLayoutInflater().inflate(R.layout.item_file, binding.containerSharedFiles, false);
+                        
+                        // Get views from the inflated layout
+                        TextView fileName = fileItemView.findViewById(R.id.textFileName);
+                        ImageView fileIcon = fileItemView.findViewById(R.id.imageFileIcon);
+                        ImageView downloadIcon = fileItemView.findViewById(R.id.imageDownload);
+                        
+                        // Set file name and icon
+                        fileName.setText(fileItem.getFileName());
+                        fileIcon.setImageResource(FileUtils.getFileIconRes(fileItem.getFileName()));
+                        
+                        // Set click listeners - using UserProfileActivity.this for context
+                        final String fileUrl = fileItem.getFileUrl();
+                        final String fName = fileItem.getFileName();
+                        
+                        downloadIcon.setOnClickListener(v -> 
+                            FileUtils.confirmAndDownloadFile(UserProfileActivity.this, fileUrl, fName)
+                        );
+                        
+                        fileItemView.setOnClickListener(v -> 
+                            FileUtils.confirmAndDownloadFile(UserProfileActivity.this, fileUrl, fName)
+                        );
+                        
+                        // Add to the container
+                        binding.containerSharedFiles.addView(fileItemView);
+                    }
+                }
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                Log.e(TAG, "Failed to load shared files: " + errorMessage);
+                // Hide the shared files section if there's an error
+                binding.sharedFilesLabel.setVisibility(View.GONE);
+                binding.viewAllFiles.setVisibility(View.GONE);
+                binding.containerSharedFiles.setVisibility(View.GONE);
+            }
+        });
+    }
+    
     private void openSharedMediaGallery() {
         Intent intent = new Intent(this, SharedMediaActivity.class);
         intent.putExtra(Constants.KEY_USER_ID, userId);
@@ -287,6 +357,11 @@ public class UserProfileActivity extends AppCompatActivity {
         // Set listener for View All button in Shared Media section
         binding.viewAllMedia.setOnClickListener(v -> {
             openSharedMediaGallery();
+        });
+
+        // Add listener for View All Files button
+        binding.viewAllFiles.setOnClickListener(v -> {
+            openSharedFilesActivity();
         });
     }
     
@@ -402,5 +477,12 @@ public class UserProfileActivity extends AppCompatActivity {
                 Toast.makeText(UserProfileActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void openSharedFilesActivity() {
+        Intent intent = new Intent(this, SharedFilesActivity.class);
+        intent.putExtra(Constants.KEY_USER_ID, userId);
+        intent.putExtra("userName", user.getName());
+        startActivity(intent);
     }
 }

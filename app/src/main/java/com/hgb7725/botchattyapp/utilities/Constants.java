@@ -36,5 +36,6 @@ public class Constants {
     public static final String KEY_OTHER_USER_ID = "otherUserId";
     public static final String KEY_BLOCKED = "blocked";  // Changed from KEY_IS_BLOCKED to KEY_BLOCKED
     public static final String KEY_MUTED = "muted";      // Changed from KEY_IS_MUTED to KEY_MUTED
+    public static final String KEY_NICKNAME = "nickname"; // Added for the nickname feature
     public static final String KEY_LAST_UPDATED = "lastUpdated";
 }

@@ -3,6 +3,7 @@ package com.hgb7725.botchattyapp.activities;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
@@ -49,6 +50,7 @@ public class UserProfileActivity extends AppCompatActivity {
         if (userId != null) {
             loadUserDetails();
             loadRelationshipStatus();
+            loadNickname();
         } else {
             Toast.makeText(this, "User ID not available", Toast.LENGTH_SHORT).show();
             finish();
@@ -92,6 +94,24 @@ public class UserProfileActivity extends AppCompatActivity {
                 // Default to unblocked/unmuted if we can't load status
                 binding.switchBlock.setChecked(false);
                 binding.switchMute.setChecked(false);
+            }
+        });
+    }
+    
+    private void loadNickname() {
+        relationshipService.getNickname(userId, new UserRelationshipService.NicknameListener() {
+            @Override
+            public void onNicknameLoaded(String nickname) {
+                // Update the nickname field with the current nickname (if any)
+                if (nickname != null && !nickname.isEmpty()) {
+                    binding.editTextNickname.setText(nickname);
+                }
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                Log.e(TAG, "Failed to load nickname: " + errorMessage);
+                // Leave the nickname field empty if we can't load the nickname
             }
         });
     }
@@ -162,12 +182,33 @@ public class UserProfileActivity extends AppCompatActivity {
             }
         });
         
-        binding.layoutClearChat.setOnClickListener(v -> {
-            Toast.makeText(this, "Clear chat functionality will be implemented soon", Toast.LENGTH_SHORT).show();
+        // Set click listener for the nickname EditText to enable it for editing when clicked
+        binding.editTextNickname.setOnClickListener(v -> {
+            binding.editTextNickname.setFocusable(true);
+            binding.editTextNickname.setFocusableInTouchMode(true);
+            binding.editTextNickname.requestFocus();
+        });
+        
+        // Set listener for the save nickname button
+        binding.buttonSaveNickname.setOnClickListener(v -> {
+            String nickname = binding.editTextNickname.getText().toString().trim();
+            updateNickname(nickname);
+        });
+        
+        // Set listener for the delete nickname button
+        binding.buttonDeleteNickname.setOnClickListener(v -> {
+            deleteNickname();
         });
         
         binding.layoutReport.setOnClickListener(v -> {
             Toast.makeText(this, "Report user functionality will be implemented soon", Toast.LENGTH_SHORT).show();
+        });
+        
+        // Also allow clicking on the entire nickname layout to focus on the EditText
+        binding.layoutSetNickname.setOnClickListener(v -> {
+            binding.editTextNickname.setFocusable(true);
+            binding.editTextNickname.setFocusableInTouchMode(true);
+            binding.editTextNickname.requestFocus();
         });
     }
     
@@ -214,6 +255,72 @@ public class UserProfileActivity extends AppCompatActivity {
                 showLoading(false);
                 // Revert the switch if the operation failed
                 binding.switchMute.setChecked(!isMuted);
+                Toast.makeText(UserProfileActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+    
+    private void updateNickname(String nickname) {
+        // Show loading while updating
+        showLoading(true);
+        
+        // Hide keyboard and clear focus from EditText
+        clearFocusAndHideKeyboard();
+        
+        // If nickname is empty, pass null to remove the nickname
+        String nicknameToSave = TextUtils.isEmpty(nickname) ? null : nickname;
+        
+        relationshipService.updateNickname(userId, nicknameToSave, new UserRelationshipService.RelationshipOperationListener() {
+            @Override
+            public void onSuccess() {
+                showLoading(false);
+                // Show feedback to user
+                String message = TextUtils.isEmpty(nickname) 
+                        ? "Nickname removed" 
+                        : "Nickname updated";
+                Toast.makeText(UserProfileActivity.this, message, Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                showLoading(false);
+                Toast.makeText(UserProfileActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+    
+    private void clearFocusAndHideKeyboard() {
+        // Clear focus from EditText
+        binding.editTextNickname.clearFocus();
+        
+        // Make EditText not focusable again
+        binding.editTextNickname.setFocusable(false);
+        
+        // Hide keyboard
+        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) 
+                getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(binding.editTextNickname.getWindowToken(), 0);
+        }
+    }
+    
+    private void deleteNickname() {
+        // Show loading while updating
+        showLoading(true);
+        
+        relationshipService.updateNickname(userId, null, new UserRelationshipService.RelationshipOperationListener() {
+            @Override
+            public void onSuccess() {
+                showLoading(false);
+                // Clear the nickname field
+                binding.editTextNickname.setText("");
+                // Show feedback to user
+                Toast.makeText(UserProfileActivity.this, "Nickname deleted", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                showLoading(false);
                 Toast.makeText(UserProfileActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
             }
         });

@@ -43,6 +43,14 @@ public class UserRelationshipService {
     }
 
     /**
+     * Interface to handle nickname results
+     */
+    public interface NicknameListener {
+        void onNicknameLoaded(String nickname);
+        void onFailure(String errorMessage);
+    }
+
+    /**
      * Constructor for UserRelationshipService
      * @param context Application context
      * @param preferenceManager Preference manager to access user preferences
@@ -108,7 +116,7 @@ public class UserRelationshipService {
      * @param listener Callback listener for the operation result
      */
     public void updateBlockStatus(String otherUserId, boolean blocked, RelationshipOperationListener listener) {
-        updateRelationship(otherUserId, blocked, null, listener);
+        updateRelationship(otherUserId, blocked, null, null, listener);
     }
 
     /**
@@ -118,7 +126,7 @@ public class UserRelationshipService {
      * @param listener Callback listener for the operation result
      */
     public void updateMuteStatus(String otherUserId, boolean muted, RelationshipOperationListener listener) {
-        updateRelationship(otherUserId, null, muted, listener);
+        updateRelationship(otherUserId, null, muted, null, listener);
     }
 
     /**
@@ -163,13 +171,57 @@ public class UserRelationshipService {
     }
 
     /**
+     * Update nickname for a user
+     * @param otherUserId ID of the other user
+     * @param nickname The nickname to set (null to remove)
+     * @param listener Callback listener for the operation result
+     */
+    public void updateNickname(String otherUserId, String nickname, RelationshipOperationListener listener) {
+        updateRelationship(otherUserId, null, null, nickname, listener);
+    }
+
+    /**
+     * Get nickname for a user
+     * @param otherUserId ID of the other user
+     * @param listener Callback listener for the result
+     */
+    public void getNickname(String otherUserId, NicknameListener listener) {
+        String currentUserId = preferenceManager.getString(Constants.KEY_USER_ID);
+        
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            listener.onFailure("Current user not available");
+            return;
+        }
+
+        database.collection(Constants.KEY_COLLECTION_USER_RELATIONSHIPS)
+                .whereEqualTo(Constants.KEY_USER_ID, currentUserId)
+                .whereEqualTo(Constants.KEY_OTHER_USER_ID, otherUserId)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    if (!queryDocumentSnapshots.isEmpty()) {
+                        DocumentSnapshot document = queryDocumentSnapshots.getDocuments().get(0);
+                        String nickname = document.getString(Constants.KEY_NICKNAME);
+                        listener.onNicknameLoaded(nickname);
+                    } else {
+                        // No relationship exists yet
+                        listener.onNicknameLoaded(null);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error getting nickname: " + e.getMessage());
+                    listener.onFailure("Failed to get nickname: " + e.getMessage());
+                });
+    }
+
+    /**
      * Private helper method to update relationship between users
      * @param otherUserId ID of the other user
      * @param blocked Block status (can be null if not changing)
      * @param muted Mute status (can be null if not changing)
+     * @param nickname Nickname (can be null if not changing)
      * @param listener Callback listener for the operation result
      */
-    private void updateRelationship(String otherUserId, Boolean blocked, Boolean muted, RelationshipOperationListener listener) {
+    private void updateRelationship(String otherUserId, Boolean blocked, Boolean muted, String nickname, RelationshipOperationListener listener) {
         String currentUserId = preferenceManager.getString(Constants.KEY_USER_ID);
         
         if (currentUserId == null || currentUserId.isEmpty()) {
@@ -189,6 +241,11 @@ public class UserRelationshipService {
                     }
                     if (muted != null) {
                         updates.put(Constants.KEY_MUTED, muted);
+                    }
+                    // Always update the nickname field when it's explicitly provided as parameter
+                    // This ensures that null values (for deleting nicknames) are properly processed
+                    if (nickname != null || nickname == null && !queryDocumentSnapshots.isEmpty()) {
+                        updates.put(Constants.KEY_NICKNAME, nickname);
                     }
                     updates.put(Constants.KEY_LAST_UPDATED, new Date());
 
@@ -210,6 +267,7 @@ public class UserRelationshipService {
                         relationshipData.put(Constants.KEY_OTHER_USER_ID, otherUserId);
                         relationshipData.put(Constants.KEY_BLOCKED, blocked != null ? blocked : false);
                         relationshipData.put(Constants.KEY_MUTED, muted != null ? muted : false);
+                        relationshipData.put(Constants.KEY_NICKNAME, nickname);
                         relationshipData.put(Constants.KEY_LAST_UPDATED, new Date());
 
                         database.collection(Constants.KEY_COLLECTION_USER_RELATIONSHIPS)

@@ -202,7 +202,7 @@
             </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/layoutClearChat"
+                android:id="@+id/layoutSetNickname"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/_12sdp"
@@ -219,23 +219,48 @@
                 <ImageView
                     android:layout_width="@dimen/_20sdp"
                     android:layout_height="@dimen/_20sdp"
-                    android:src="@drawable/ic_delete"
+                    android:src="@drawable/ic_edit"
                     app:tint="@color/primary" />
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginStart="@dimen/_8sdp"
-                    android:text="Clear chat history"
+                    android:text="Nickname:"
                     android:textColor="@color/primary_text"
                     android:textSize="@dimen/_11ssp" />
 
+                <EditText
+                    android:id="@+id/editTextNickname"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/_4sdp"
+                    android:layout_marginEnd="@dimen/_4sdp"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:hint="Enter nickname"
+                    android:inputType="textPersonName"
+                    android:maxLines="1"
+                    android:focusable="false"
+                    android:focusableInTouchMode="true"
+                    android:textColor="@color/primary_text"
+                    android:textSize="@dimen/_13ssp"
+                    tools:ignore="TouchTargetSizeCheck" />
+
                 <androidx.appcompat.widget.AppCompatImageView
-                    android:layout_width="@dimen/_16sdp"
-                    android:layout_height="@dimen/_16sdp"
-                    android:src="@drawable/ic_arrow_right"
-                    app:tint="@color/secondary_text" />
+                    android:id="@+id/buttonDeleteNickname"
+                    android:layout_width="@dimen/_20sdp"
+                    android:layout_height="@dimen/_20sdp"
+                    android:layout_marginEnd="@dimen/_8sdp"
+                    android:src="@drawable/ic_delete"
+                    app:tint="@color/error" />
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/buttonSaveNickname"
+                    android:layout_width="@dimen/_20sdp"
+                    android:layout_height="@dimen/_20sdp"
+                    android:src="@drawable/ic_check"
+                    app:tint="@color/primary" />
 
             </LinearLayout>
 
@@ -252,7 +277,7 @@
                 android:gravity="center_vertical"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/layoutClearChat">
+                app:layout_constraintTop_toBottomOf="@id/layoutSetNickname">
 
                 <ImageView
                     android:layout_width="@dimen/_20sdp"

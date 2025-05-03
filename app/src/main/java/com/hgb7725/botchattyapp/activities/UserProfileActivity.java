@@ -1,5 +1,6 @@
 package com.hgb7725.botchattyapp.activities;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
@@ -10,14 +11,21 @@ import android.view.View;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.hgb7725.botchattyapp.adapters.MediaPreviewAdapter;
 import com.hgb7725.botchattyapp.databinding.ActivityUserProfileBinding;
+import com.hgb7725.botchattyapp.firebase.MediaFirebaseService;
 import com.hgb7725.botchattyapp.firebase.UserFirebaseService;
 import com.hgb7725.botchattyapp.firebase.UserRelationshipService;
+import com.hgb7725.botchattyapp.models.MediaItem;
 import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.BlockStatusChecker;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserProfileActivity extends AppCompatActivity {
 
@@ -26,9 +34,11 @@ public class UserProfileActivity extends AppCompatActivity {
     private PreferenceManager preferenceManager;
     private UserFirebaseService userFirebaseService;
     private UserRelationshipService relationshipService;
+    private MediaFirebaseService mediaFirebaseService;
     private BlockStatusChecker blockStatusChecker;
     private String userId;
     private static final String TAG = "UserProfileActivity";
+    private static final int MAX_PREVIEW_MEDIA = 4;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,6 +49,7 @@ public class UserProfileActivity extends AppCompatActivity {
         preferenceManager = new PreferenceManager(getApplicationContext());
         userFirebaseService = new UserFirebaseService(this, preferenceManager);
         relationshipService = new UserRelationshipService(this, preferenceManager);
+        mediaFirebaseService = new MediaFirebaseService(this, preferenceManager);
         blockStatusChecker = new BlockStatusChecker(this, preferenceManager);
         
         // Show loading state
@@ -51,6 +62,7 @@ public class UserProfileActivity extends AppCompatActivity {
             loadUserDetails();
             loadRelationshipStatus();
             loadNickname();
+            loadSharedMedia();
         } else {
             Toast.makeText(this, "User ID not available", Toast.LENGTH_SHORT).show();
             finish();
@@ -114,6 +126,67 @@ public class UserProfileActivity extends AppCompatActivity {
                 // Leave the nickname field empty if we can't load the nickname
             }
         });
+    }
+    
+    private void loadSharedMedia() {
+        // Load a preview of shared media
+        mediaFirebaseService.fetchMediaPreview(userId, MAX_PREVIEW_MEDIA + 1, new MediaFirebaseService.MediaFetchListener() {
+            @Override
+            public void onMediaFetched(List<MediaItem> mediaItems) {
+                if (mediaItems.isEmpty()) {
+                    // Hide the shared media section if there are no media items
+                    binding.sharedMediaLabel.setVisibility(View.GONE);
+                    binding.viewAllMedia.setVisibility(View.GONE);
+                    binding.recyclerViewSharedMedia.setVisibility(View.GONE);
+                } else {
+                    // Show the shared media section
+                    binding.sharedMediaLabel.setVisibility(View.VISIBLE);
+                    binding.viewAllMedia.setVisibility(View.VISIBLE);
+                    binding.recyclerViewSharedMedia.setVisibility(View.VISIBLE);
+                    
+                    // Determine if we need a "View More" button
+                    boolean showMoreButton = mediaItems.size() > MAX_PREVIEW_MEDIA;
+                    int totalCount = mediaItems.size();
+                    
+                    // If we have more items than MAX_PREVIEW_MEDIA, limit the list
+                    List<MediaItem> previewItems = mediaItems;
+                    if (showMoreButton) {
+                        previewItems = new ArrayList<>(mediaItems.subList(0, MAX_PREVIEW_MEDIA));
+                        // Add the last item for the "View More" button thumbnail
+                        previewItems.add(mediaItems.get(MAX_PREVIEW_MEDIA));
+                    }
+                    
+                    // Set up the RecyclerView
+                    binding.recyclerViewSharedMedia.setLayoutManager(
+                            new LinearLayoutManager(UserProfileActivity.this, LinearLayoutManager.HORIZONTAL, false));
+                    
+                    MediaPreviewAdapter adapter = new MediaPreviewAdapter(
+                            UserProfileActivity.this, previewItems, showMoreButton, totalCount);
+                    
+                    adapter.setOnMoreButtonClickListener(() -> {
+                        openSharedMediaGallery();
+                    });
+                    
+                    binding.recyclerViewSharedMedia.setAdapter(adapter);
+                }
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                Log.e(TAG, "Failed to load shared media: " + errorMessage);
+                // Hide the shared media section if there's an error
+                binding.sharedMediaLabel.setVisibility(View.GONE);
+                binding.viewAllMedia.setVisibility(View.GONE);
+                binding.recyclerViewSharedMedia.setVisibility(View.GONE);
+            }
+        });
+    }
+    
+    private void openSharedMediaGallery() {
+        Intent intent = new Intent(this, SharedMediaActivity.class);
+        intent.putExtra(Constants.KEY_USER_ID, userId);
+        intent.putExtra("userName", user.getName());
+        startActivity(intent);
     }
     
     private void showLoading(boolean isLoading) {
@@ -209,6 +282,11 @@ public class UserProfileActivity extends AppCompatActivity {
             binding.editTextNickname.setFocusable(true);
             binding.editTextNickname.setFocusableInTouchMode(true);
             binding.editTextNickname.requestFocus();
+        });
+        
+        // Set listener for View All button in Shared Media section
+        binding.viewAllMedia.setOnClickListener(v -> {
+            openSharedMediaGallery();
         });
     }
     

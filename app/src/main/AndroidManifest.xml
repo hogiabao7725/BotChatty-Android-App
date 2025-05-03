@@ -35,6 +35,12 @@
             android:name=".activities.SettingsActivity"
             android:exported="false" />
             
+        <!-- Shared Media Gallery Activity -->
+        <activity
+            android:name=".activities.SharedMediaActivity"
+            android:exported="false"
+            android:theme="@style/Base.Theme.BotChattyApp" />
+            
         <!-- Privacy Policy Activity -->
         <activity
             android:name=".activities.PrivacyPolicyActivity"

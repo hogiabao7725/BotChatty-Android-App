@@ -48,4 +48,14 @@
     <string name="blocked_both_ways">Both users have blocked each other</string>
     <string name="blocked_both_ways_hint">This conversation is blocked</string>
     <string name="you_blocked_hint">You have blocked this conversation</string>
+    
+    <!-- Shared Media Strings -->
+    <string name="shared_media">Shared Media</string>
+    <string name="view_all">View All</string>
+    <string name="no_shared_media">No shared media</string>
+    <string name="no_shared_images">No images shared</string>
+    <string name="no_shared_videos">No videos shared</string>
+    <string name="images">Images</string>
+    <string name="videos">Videos</string>
+    <string name="loading_media">Loading media...</string>
 </resources>

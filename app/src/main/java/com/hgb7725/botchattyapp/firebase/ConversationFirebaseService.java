@@ -5,6 +5,7 @@ import android.widget.Toast;
 
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
@@ -15,6 +16,7 @@ import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 
 public class ConversationFirebaseService {
@@ -24,6 +26,7 @@ public class ConversationFirebaseService {
     private List<ChatMessage> conversations = new ArrayList<>();
     private ConversationListener conversationListener;
     private Context context;
+    private String conversionId = null;
 
     public ConversationFirebaseService(Context context, PreferenceManager preferenceManager) {
         if (context == null) {
@@ -39,9 +42,22 @@ public class ConversationFirebaseService {
         // Conversations list is already initialized above
     }
 
+    // Constructor for use in ChatFirebaseService
+    public ConversationFirebaseService(PreferenceManager preferenceManager) {
+        if (preferenceManager == null) {
+            throw new IllegalArgumentException("PreferenceManager cannot be null");
+        }
+        
+        this.preferenceManager = preferenceManager;
+    }
+
     public interface ConversationListener {
         void onConversationsLoaded(List<ChatMessage> conversations);
         void onConversationsUpdated();
+    }
+
+    public interface ConversionIdListener {
+        void onConversionIdReceived(String conversionId);
     }
 
     public void setConversationListener(ConversationListener listener) {
@@ -59,6 +75,139 @@ public class ConversationFirebaseService {
         database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
                 .whereEqualTo(Constants.KEY_RECEIVER_ID, preferenceManager.getString(Constants.KEY_USER_ID))
                 .addSnapshotListener(eventListener);
+    }
+
+    // Added from ChatFirebaseService
+    public void markConversationAsRead(String receiverId) {
+        // Find the conversation in Firestore and set unreadCount to 0
+        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                .whereEqualTo(Constants.KEY_SENDER_ID, receiverId)
+                .whereEqualTo(Constants.KEY_RECEIVER_ID, preferenceManager.getString(Constants.KEY_USER_ID))
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
+                        // Update unreadCount to 0 in Firestore
+                        DocumentReference documentReference = task.getResult().getDocuments().get(0).getReference();
+                        documentReference.update("unreadCount", 0);
+                    }
+                });
+    }
+
+    // Added from ChatFirebaseService
+    public void addConversion(HashMap<String, Object> conversion, ConversionIdListener listener) {
+        // Check conversation in both directions (sender -> receiver and receiver -> sender)
+        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                .whereEqualTo(Constants.KEY_SENDER_ID, conversion.get(Constants.KEY_SENDER_ID))
+                .whereEqualTo(Constants.KEY_RECEIVER_ID, conversion.get(Constants.KEY_RECEIVER_ID))
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
+                        // If found in sender -> receiver direction
+                        DocumentReference documentReference = task.getResult().getDocuments().get(0).getReference();
+                        conversionId = documentReference.getId();
+                        documentReference.update(conversion);
+                        if (listener != null) {
+                            listener.onConversionIdReceived(conversionId);
+                        }
+                    } else {
+                        // If not found in first direction, check reverse
+                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                                .whereEqualTo(Constants.KEY_SENDER_ID, conversion.get(Constants.KEY_RECEIVER_ID))
+                                .whereEqualTo(Constants.KEY_RECEIVER_ID, conversion.get(Constants.KEY_SENDER_ID))
+                                .get()
+                                .addOnCompleteListener(reverseTask -> {
+                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && !reverseTask.getResult().isEmpty()) {
+                                        // If found in receiver -> sender direction
+                                        DocumentReference reverseDocRef = reverseTask.getResult().getDocuments().get(0).getReference();
+                                        conversionId = reverseDocRef.getId();
+                                        reverseDocRef.update(conversion);
+                                        if (listener != null) {
+                                            listener.onConversionIdReceived(conversionId);
+                                        }
+                                    } else {
+                                        // If not found in either direction, create new
+                                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                                                .add(conversion)
+                                                .addOnSuccessListener(documentReference -> {
+                                                    conversionId = documentReference.getId();
+                                                    if (listener != null) {
+                                                        listener.onConversionIdReceived(conversionId);
+                                                    }
+                                                });
+                                    }
+                                });
+                    }
+                });
+    }
+
+    // Added from ChatFirebaseService
+    public void updateConversion(String receiverId, String receiverName, String receiverImage, String message) {
+        if (conversionId == null) return;
+        
+        DocumentReference documentReference =
+                database.collection(Constants.KEY_COLLECTION_CONVERSATIONS).document(conversionId);
+
+        HashMap<String, Object> updates = new HashMap<>();
+        updates.put(Constants.KEY_LAST_MESSAGE, message);
+        updates.put(Constants.KEY_TIMESTAMP, new Date());
+        updates.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+        updates.put(Constants.KEY_RECEIVER_ID, receiverId);
+        updates.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
+        updates.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
+        updates.put(Constants.KEY_RECEIVER_NAME, receiverName);
+        updates.put(Constants.KEY_RECEIVER_IMAGE, receiverImage);
+        updates.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
+        updates.put("unreadCount", com.google.firebase.firestore.FieldValue.increment(1));
+        
+        documentReference.update(updates);
+    }
+
+    // Added from ChatFirebaseService
+    public void checkForConversion(String senderId, String receiverId, ConversionIdListener listener) {
+        checkForConversionRemotely(senderId, receiverId, listener);
+        checkForConversionRemotely(receiverId, senderId, listener);
+    }
+
+    // Added from ChatFirebaseService
+    private void checkForConversionRemotely(String senderId, String receiverId, ConversionIdListener listener) {
+        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                .whereEqualTo(Constants.KEY_SENDER_ID, senderId)
+                .whereEqualTo(Constants.KEY_RECEIVER_ID, receiverId)
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && task.getResult().getDocuments().size() > 0) {
+                        DocumentSnapshot documentSnapshot = task.getResult().getDocuments().get(0);
+                        conversionId = documentSnapshot.getId();
+                        if (listener != null) {
+                            listener.onConversionIdReceived(conversionId);
+                        }
+                    } else {
+                        // If not found in first direction, check reverse
+                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
+                                .whereEqualTo(Constants.KEY_SENDER_ID, receiverId)
+                                .whereEqualTo(Constants.KEY_RECEIVER_ID, senderId)
+                                .get()
+                                .addOnCompleteListener(reverseTask -> {
+                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && reverseTask.getResult().getDocuments().size() > 0) {
+                                        DocumentSnapshot reverseDocSnapshot = reverseTask.getResult().getDocuments().get(0);
+                                        conversionId = reverseDocSnapshot.getId();
+                                        if (listener != null) {
+                                            listener.onConversionIdReceived(conversionId);
+                                        }
+                                    }
+                                });
+                    }
+                });
+    }
+
+    // Added from ChatFirebaseService
+    public void setConversionId(String id) {
+        this.conversionId = id;
+    }
+
+    // Added from ChatFirebaseService
+    public String getConversionId() {
+        return conversionId;
     }
 
     private final EventListener<QuerySnapshot> eventListener = (value, error) -> {
@@ -256,7 +405,9 @@ public class ConversationFirebaseService {
     }
     
     private void showToast(String message) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+        if (context != null) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+        }
     }
     
     /**

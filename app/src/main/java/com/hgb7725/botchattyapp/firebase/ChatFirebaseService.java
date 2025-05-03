@@ -1,6 +1,5 @@
 package com.hgb7725.botchattyapp.firebase;
 
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -24,15 +23,16 @@ import java.util.Locale;
 public class ChatFirebaseService {
     private final FirebaseFirestore database;
     private final PreferenceManager preferenceManager;
-    private String conversionId = null;
     private final List<ChatMessage> chatMessages;
     private EventListener<QuerySnapshot> eventListener;
     private OnMessageReceiveListener onMessageReceiveListener;
+    private final ConversationFirebaseService conversationService;
 
     public ChatFirebaseService(PreferenceManager preferenceManager) {
         this.preferenceManager = preferenceManager;
         this.database = FirebaseFirestore.getInstance();
         this.chatMessages = new ArrayList<>();
+        this.conversationService = new ConversationFirebaseService(preferenceManager);
     }
 
     public interface OnMessageReceiveListener {
@@ -54,8 +54,8 @@ public class ChatFirebaseService {
         
         database.collection(Constants.KEY_COLLECTION_CHAT).add(messageData);
 
-        if(conversionId != null) {
-            updateConversion(receiverId, receiverName, receiverImage, message);
+        if(getConversionId() != null) {
+            conversationService.updateConversion(receiverId, receiverName, receiverImage, message);
         } else {
             HashMap<String, Object> conversion = new HashMap<>();
             conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
@@ -68,7 +68,12 @@ public class ChatFirebaseService {
             conversion.put(Constants.KEY_TIMESTAMP, new Date());
             conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
             conversion.put("unreadCount", 1);
-            addConversion(conversion);
+            conversationService.addConversion(conversion, conversionId -> {
+                setConversionId(conversionId);
+                if (onMessageReceiveListener != null) {
+                    onMessageReceiveListener.onConversionIdReceived(conversionId);
+                }
+            });
         }
     }
 
@@ -83,8 +88,8 @@ public class ChatFirebaseService {
 
         database.collection(Constants.KEY_COLLECTION_CHAT).add(message);
 
-        if (conversionId != null) {
-            updateConversion(receiverId, receiverName, receiverImage, "File: " + fileName);
+        if (getConversionId() != null) {
+            conversationService.updateConversion(receiverId, receiverName, receiverImage, "File: " + fileName);
         } else {
             HashMap<String, Object> conversion = new HashMap<>();
             conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
@@ -97,7 +102,12 @@ public class ChatFirebaseService {
             conversion.put(Constants.KEY_TIMESTAMP, new Date());
             conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
             conversion.put("unreadCount", 1);
-            addConversion(conversion);
+            conversationService.addConversion(conversion, conversionId -> {
+                setConversionId(conversionId);
+                if (onMessageReceiveListener != null) {
+                    onMessageReceiveListener.onConversionIdReceived(conversionId);
+                }
+            });
         }
     }
 
@@ -122,8 +132,14 @@ public class ChatFirebaseService {
                 conversion.put(Constants.KEY_TIMESTAMP, new Date());
                 conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
                 conversion.put("unreadCount", com.google.firebase.firestore.FieldValue.increment(1));
+                
                 // Include both cases: conversation exists or not
-                addConversion(conversion);
+                conversationService.addConversion(conversion, conversionId -> {
+                    setConversionId(conversionId);
+                    if (onMessageReceiveListener != null) {
+                        onMessageReceiveListener.onConversionIdReceived(conversionId);
+                    }
+                });
             });
     }
 
@@ -149,24 +165,20 @@ public class ChatFirebaseService {
                 conversion.put(Constants.KEY_TIMESTAMP, new Date());
                 conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
                 conversion.put("unreadCount", com.google.firebase.firestore.FieldValue.increment(1));
+                
                 // Include both cases: conversation exists or not
-                addConversion(conversion);
+                conversationService.addConversion(conversion, conversionId -> {
+                    setConversionId(conversionId);
+                    if (onMessageReceiveListener != null) {
+                        onMessageReceiveListener.onConversionIdReceived(conversionId);
+                    }
+                });
             });
     }
 
     public void markConversationAsRead(String receiverId) {
-        // Find the conversation in Firestore and set unreadCount to 0
-        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                .whereEqualTo(Constants.KEY_SENDER_ID, receiverId)
-                .whereEqualTo(Constants.KEY_RECEIVER_ID, preferenceManager.getString(Constants.KEY_USER_ID))
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
-                        // Update unreadCount to 0 in Firestore
-                        DocumentReference documentReference = task.getResult().getDocuments().get(0).getReference();
-                        documentReference.update("unreadCount", 0);
-                    }
-                });
+        // Delegate to ConversationFirebaseService
+        conversationService.markConversationAsRead(receiverId);
     }
 
     public void listenForMessages(String senderId, String receiverId) {
@@ -223,8 +235,13 @@ public class ChatFirebaseService {
                     onMessageReceiveListener.onMessagesReceived(chatMessages, count);
                 }
             }
-            if (conversionId == null) {
-                checkForConversion(senderId, receiverId);
+            if (getConversionId() == null && chatMessages.size() > 0) {
+                conversationService.checkForConversion(senderId, receiverId, conversionId -> {
+                    setConversionId(conversionId);
+                    if (onMessageReceiveListener != null) {
+                        onMessageReceiveListener.onConversionIdReceived(conversionId);
+                    }
+                });
             }
         };
 
@@ -275,116 +292,12 @@ public class ChatFirebaseService {
         void onTokenUpdated(String token);
     }
 
-    private void addConversion(HashMap<String, Object> conversion) {
-        // Check conversation in both directions (sender -> receiver and receiver -> sender)
-        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                .whereEqualTo(Constants.KEY_SENDER_ID, conversion.get(Constants.KEY_SENDER_ID))
-                .whereEqualTo(Constants.KEY_RECEIVER_ID, conversion.get(Constants.KEY_RECEIVER_ID))
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
-                        // If found in sender -> receiver direction
-                        DocumentReference documentReference = task.getResult().getDocuments().get(0).getReference();
-                        conversionId = documentReference.getId();
-                        documentReference.update(conversion);
-                        if (onMessageReceiveListener != null) {
-                            onMessageReceiveListener.onConversionIdReceived(conversionId);
-                        }
-                    } else {
-                        // If not found in first direction, check reverse
-                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                                .whereEqualTo(Constants.KEY_SENDER_ID, conversion.get(Constants.KEY_RECEIVER_ID))
-                                .whereEqualTo(Constants.KEY_RECEIVER_ID, conversion.get(Constants.KEY_SENDER_ID))
-                                .get()
-                                .addOnCompleteListener(reverseTask -> {
-                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && !reverseTask.getResult().isEmpty()) {
-                                        // If found in receiver -> sender direction
-                                        DocumentReference reverseDocRef = reverseTask.getResult().getDocuments().get(0).getReference();
-                                        conversionId = reverseDocRef.getId();
-                                        reverseDocRef.update(conversion);
-                                        if (onMessageReceiveListener != null) {
-                                            onMessageReceiveListener.onConversionIdReceived(conversionId);
-                                        }
-                                    } else {
-                                        // If not found in either direction, create new
-                                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                                                .add(conversion)
-                                                .addOnSuccessListener(documentReference -> {
-                                                    conversionId = documentReference.getId();
-                                                    if (onMessageReceiveListener != null) {
-                                                        onMessageReceiveListener.onConversionIdReceived(conversionId);
-                                                    }
-                                                });
-                                    }
-                                });
-                    }
-                });
-    }
-
-    private void updateConversion(String receiverId, String receiverName, String receiverImage, String message) {
-        DocumentReference documentReference =
-                database.collection(Constants.KEY_COLLECTION_CONVERSATIONS).document(conversionId);
-
-        HashMap<String, Object> updates = new HashMap<>();
-        updates.put(Constants.KEY_LAST_MESSAGE, message);
-        updates.put(Constants.KEY_TIMESTAMP, new Date());
-        updates.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
-        updates.put(Constants.KEY_RECEIVER_ID, receiverId);
-        updates.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
-        updates.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
-        updates.put(Constants.KEY_RECEIVER_NAME, receiverName);
-        updates.put(Constants.KEY_RECEIVER_IMAGE, receiverImage);
-        updates.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
-        updates.put("unreadCount", com.google.firebase.firestore.FieldValue.increment(1));
-        
-        documentReference.update(updates);
-    }
-
-    private void checkForConversion(String senderId, String receiverId) {
-        if (chatMessages.size() != 0) {
-            checkForConversionRemotely(senderId, receiverId);
-            checkForConversionRemotely(receiverId, senderId);
-        }
-    }
-
-    private void checkForConversionRemotely(String senderId, String receiverId) {
-        // Check both directions of the conversation
-        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                .whereEqualTo(Constants.KEY_SENDER_ID, senderId)
-                .whereEqualTo(Constants.KEY_RECEIVER_ID, receiverId)
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null && task.getResult().getDocuments().size() > 0) {
-                        DocumentSnapshot documentSnapshot = task.getResult().getDocuments().get(0);
-                        conversionId = documentSnapshot.getId();
-                        if (onMessageReceiveListener != null) {
-                            onMessageReceiveListener.onConversionIdReceived(conversionId);
-                        }
-                    } else {
-                        // If not found in first direction, check reverse
-                        database.collection(Constants.KEY_COLLECTION_CONVERSATIONS)
-                                .whereEqualTo(Constants.KEY_SENDER_ID, receiverId)
-                                .whereEqualTo(Constants.KEY_RECEIVER_ID, senderId)
-                                .get()
-                                .addOnCompleteListener(reverseTask -> {
-                                    if (reverseTask.isSuccessful() && reverseTask.getResult() != null && reverseTask.getResult().getDocuments().size() > 0) {
-                                        DocumentSnapshot reverseDocSnapshot = reverseTask.getResult().getDocuments().get(0);
-                                        conversionId = reverseDocSnapshot.getId();
-                                        if (onMessageReceiveListener != null) {
-                                            onMessageReceiveListener.onConversionIdReceived(conversionId);
-                                        }
-                                    }
-                                });
-                    }
-                });
-    }
-
     public void setConversionId(String id) {
-        this.conversionId = id;
+        conversationService.setConversionId(id);
     }
 
     public String getConversionId() {
-        return conversionId;
+        return conversationService.getConversionId();
     }
 
     public List<ChatMessage> getChatMessages() {

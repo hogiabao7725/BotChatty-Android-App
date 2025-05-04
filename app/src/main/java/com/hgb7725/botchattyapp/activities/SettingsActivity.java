@@ -44,6 +44,7 @@ public class SettingsActivity extends BaseActivity {
     private UserFirebaseService userService;
     private static final String KEY_NOTIFICATIONS_ENABLED = "notifications_enabled";
     private static final String TAG = "SettingsActivity";
+    private AppCompatImageView imageEdit;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,6 +70,7 @@ public class SettingsActivity extends BaseActivity {
         buttonLogout = findViewById(R.id.buttonLogout);
         buttonChangePassword = findViewById(R.id.buttonChangePassword);
         buttonDeleteAccount = findViewById(R.id.buttonDeleteAccount);
+        imageEdit = findViewById(R.id.imageEdit);
         
         // Initialize setting items
         LinearLayout layoutPrivacy = findViewById(R.id.layoutPrivacy);
@@ -80,6 +82,12 @@ public class SettingsActivity extends BaseActivity {
         // Set up back button
         AppCompatImageView imageBack = findViewById(R.id.imageBack);
         imageBack.setOnClickListener(v -> onBackPressed());
+        
+        // Set up edit profile button
+        imageEdit.setOnClickListener(v -> {
+            Intent intent = new Intent(SettingsActivity.this, EditProfileActivity.class);
+            startActivity(intent);
+        });
         
         // Set up settings navigation
         LinearLayout layoutPrivacy = findViewById(R.id.layoutPrivacy);
@@ -181,6 +189,13 @@ public class SettingsActivity extends BaseActivity {
             switchNotifications.setChecked(true);
             switchOnlineStatus.setChecked(true);
         }
+    }
+    
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh user data when returning from edit profile
+        loadUserData();
     }
     
     private void loadUserData() {

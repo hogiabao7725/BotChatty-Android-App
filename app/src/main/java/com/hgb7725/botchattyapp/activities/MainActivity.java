@@ -75,10 +75,57 @@ public class MainActivity extends BaseActivity implements ConversionListener {
     }
 
     private void loadUserDetails() {
-        binding.textName.setText(preferenceManager.getString(Constants.KEY_NAME));
-        byte[] bytes = Base64.decode(preferenceManager.getString(Constants.KEY_IMAGE), Base64.DEFAULT);
-        Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-        binding.imageProfile.setImageBitmap(bitmap);
+        // Get user details from preferences
+        String name = preferenceManager.getString(Constants.KEY_NAME);
+        String imageString = preferenceManager.getString(Constants.KEY_IMAGE);
+        
+        if (name != null && !name.isEmpty()) {
+            binding.textName.setText(name);
+        }
+        
+        if (imageString != null && !imageString.isEmpty()) {
+            try {
+                byte[] bytes = Base64.decode(imageString, Base64.DEFAULT);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                binding.imageProfile.setImageBitmap(bitmap);
+            } catch (Exception e) {
+                // Log and handle possible exceptions with decoding
+            }
+        }
+    }
+    
+    /**
+     * Refreshes user details by fetching the latest data from Firebase
+     * This ensures any changes made in EditProfileActivity are displayed
+     */
+    private void refreshUserDetails() {
+        userService.getCurrentUser(new UserFirebaseService.UserProfileListener() {
+            @Override
+            public void onUserDataLoaded(User user) {
+                // Update UI with user data
+                if (user != null) {
+                    binding.textName.setText(user.getName());
+                    
+                    // Load profile image if available
+                    String imageString = user.getImage();
+                    if (imageString != null && !imageString.isEmpty()) {
+                        try {
+                            byte[] bytes = Base64.decode(imageString, Base64.DEFAULT);
+                            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                            binding.imageProfile.setImageBitmap(bitmap);
+                        } catch (Exception e) {
+                            // Handle possible exceptions with decoding
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
+                // Fallback to preferences if Firebase fetch fails
+                loadUserDetails();
+            }
+        });
     }
 
     private void showToast(String message) {
@@ -134,6 +181,9 @@ public class MainActivity extends BaseActivity implements ConversionListener {
     @Override
     protected void onResume() {
         super.onResume();
+        // Refresh user details when returning to MainActivity
+        refreshUserDetails();
+        
         // Refresh the conversation list when returning to MainActivity
         if (conversationService != null) {
             // Force a refresh of conversations from Firebase

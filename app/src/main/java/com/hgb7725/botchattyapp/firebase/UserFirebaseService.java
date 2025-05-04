@@ -39,6 +39,11 @@ public class UserFirebaseService {
         void onFailure(String errorMessage);
     }
     
+    public interface UserProfileUpdateListener {
+        void onUpdateSuccess();
+        void onUpdateFailure(String errorMessage);
+    }
+    
     public UserFirebaseService(Context context, PreferenceManager preferenceManager) {
         if (context == null) {
             throw new IllegalArgumentException("Context cannot be null");
@@ -300,6 +305,73 @@ public class UserFirebaseService {
             Log.e(TAG, "Error in deleteAccount: " + e.getMessage());
             if (listener != null) {
                 listener.onSignOutFailure("Error while deleting account: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Updates user profile information
+     * @param name Updated user name (optional, can be null)
+     * @param email Updated email (optional, can be null)
+     * @param image Updated profile image Base64 string (optional, can be null)
+     * @param listener Interface callback to notify results
+     */
+    public void updateUserProfile(String name, String email, String image, UserProfileUpdateListener listener) {
+        try {
+            String userId = preferenceManager.getString(Constants.KEY_USER_ID);
+            if (userId == null) {
+                if (listener != null) {
+                    listener.onUpdateFailure("User ID is null when updating profile");
+                }
+                return;
+            }
+            
+            DocumentReference documentReference = database.collection(Constants.KEY_COLLECTION_USERS)
+                    .document(userId);
+            HashMap<String, Object> updates = new HashMap<>();
+            
+            // Only update fields that have new values
+            if (name != null && !name.trim().isEmpty()) {
+                updates.put(Constants.KEY_NAME, name);
+                // Update in preferences too
+                preferenceManager.putString(Constants.KEY_NAME, name);
+            }
+            
+            if (email != null && !email.trim().isEmpty()) {
+                updates.put(Constants.KEY_EMAIL, email);
+                // Update in preferences too
+                preferenceManager.putString(Constants.KEY_EMAIL, email);
+            }
+            
+            if (image != null && !image.trim().isEmpty()) {
+                updates.put(Constants.KEY_IMAGE, image);
+                // Update in preferences too
+                preferenceManager.putString(Constants.KEY_IMAGE, image);
+            }
+            
+            if (updates.isEmpty()) {
+                if (listener != null) {
+                    listener.onUpdateFailure("No changes to update");
+                }
+                return;
+            }
+            
+            documentReference.update(updates)
+                    .addOnSuccessListener(aVoid -> {
+                        if (listener != null) {
+                            listener.onUpdateSuccess();
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Firebase error updating profile: " + e.getMessage());
+                        if (listener != null) {
+                            listener.onUpdateFailure("Unable to update profile: " + e.getMessage());
+                        }
+                    });
+        } catch (Exception e) {
+            Log.e(TAG, "Error in updateUserProfile: " + e.getMessage());
+            if (listener != null) {
+                listener.onUpdateFailure("An error occurred: " + e.getMessage());
             }
         }
     }

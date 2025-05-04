@@ -90,7 +90,7 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/textUsername" />
-                
+
             <View
                 android:id="@+id/divider1"
                 android:layout_width="match_parent"
@@ -102,6 +102,18 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/textEmail" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/imageEdit"
+                android:layout_width="@dimen/_32sdp"
+                android:layout_height="@dimen/_32sdp"
+                android:layout_marginEnd="@dimen/_12sdp"
+                android:background="@drawable/background_icon"
+                android:padding="@dimen/_6sdp"
+                android:src="@drawable/ic_edit"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@id/divider1"
+                app:tint="@color/primary" />
 
             <TextView
                 android:id="@+id/settingsLabel"

@@ -66,12 +66,35 @@ public class RencentConversationsAdapter extends RecyclerView.Adapter<RencentCon
         }
 
         void setData(ChatMessage chatMessage) {
-            binding.imageProfile.setImageBitmap(getConversionImage(chatMessage.getConversionImage()));
-            binding.textName.setText(chatMessage.getConversionName());
+            // Get user data from users collection if not already loaded
+            if (chatMessage.getConversionName() == null || chatMessage.getConversionImage() == null) {
+                database.collection(Constants.KEY_COLLECTION_USERS)
+                    .document(chatMessage.getConversionId())
+                    .get()
+                    .addOnSuccessListener(userDocument -> {
+                        if (userDocument.exists()) {
+                            chatMessage.setConversionName(userDocument.getString(Constants.KEY_NAME));
+                            chatMessage.setConversionImage(userDocument.getString(Constants.KEY_IMAGE));
+                            
+                            // Update the UI with the loaded data
+                            if (chatMessage.getConversionImage() != null) {
+                                binding.imageProfile.setImageBitmap(getConversionImage(chatMessage.getConversionImage()));
+                            }
+                            if (chatMessage.getConversionName() != null) {
+                                binding.textName.setText(chatMessage.getConversionName());
+                            }
+                        }
+                    });
+            } else {
+                // Use existing data if available
+                binding.imageProfile.setImageBitmap(getConversionImage(chatMessage.getConversionImage()));
+                binding.textName.setText(chatMessage.getConversionName());
+            }
+            
             binding.textRecentMessage.setText(chatMessage.getMessage());
             binding.textDateTime.setText(getReadableDateTime(chatMessage.getDateObject()));
             
-            // Hiển thị số tin nhắn chưa đọc nếu có
+            // Display unread message count if any
             if (chatMessage.getUnreadCount() > 0) {
                 binding.textUnreadCount.setVisibility(View.VISIBLE);
                 binding.textUnreadCount.setText(String.valueOf(chatMessage.getUnreadCount()));
@@ -87,7 +110,7 @@ public class RencentConversationsAdapter extends RecyclerView.Adapter<RencentCon
                 conversionListener.onConversionClicked(user);
             });
 
-            // Check availability status like in ChatActivity
+            // Check availability status
             database.collection(Constants.KEY_COLLECTION_USERS).document(
                     chatMessage.getConversionId()
             ).addSnapshotListener((value, error) -> {
@@ -95,11 +118,17 @@ public class RencentConversationsAdapter extends RecyclerView.Adapter<RencentCon
                     return;
                 }
                 if (value != null) {
+                    // Check if online status should be visible
+                    Boolean isOnlineStatusVisible = value.getBoolean(Constants.KEY_ONLINE_STATUS_VISIBLE);
+                    if (isOnlineStatusVisible == null) {
+                        isOnlineStatusVisible = true;
+                    }
+                    
                     if (value.getLong(Constants.KEY_AVAILABILITY) != null) {
                         int availability = Objects.requireNonNull(
                                 value.getLong(Constants.KEY_AVAILABILITY)
                         ).intValue();
-                        boolean isOnline = availability == 1;
+                        boolean isOnline = availability == 1 && isOnlineStatusVisible;
                         binding.viewOnlineStatus.setBackgroundResource(
                                 isOnline ? R.drawable.background_online_status : R.drawable.background_offline_status
                         );

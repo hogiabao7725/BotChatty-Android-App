@@ -141,7 +141,7 @@ public class ConversationFirebaseService {
     }
 
     // Added from ChatFirebaseService
-    public void updateConversion(String receiverId, String receiverName, String receiverImage, String message) {
+    public void updateConversion(String receiverId, String message) {
         if (conversionId == null) return;
         
         DocumentReference documentReference =
@@ -152,10 +152,6 @@ public class ConversationFirebaseService {
         updates.put(Constants.KEY_TIMESTAMP, new Date());
         updates.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
         updates.put(Constants.KEY_RECEIVER_ID, receiverId);
-        updates.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
-        updates.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
-        updates.put(Constants.KEY_RECEIVER_NAME, receiverName);
-        updates.put(Constants.KEY_RECEIVER_IMAGE, receiverImage);
         updates.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
         updates.put("unreadCount", com.google.firebase.firestore.FieldValue.increment(1));
         
@@ -236,15 +232,33 @@ public class ConversationFirebaseService {
                         chatMessage.setSenderId(senderId);
                         chatMessage.setReceiverId(receiverId);
 
+                        // Determine which user's details we need to fetch (sender or receiver)
+                        String userIdToFetch;
                         if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
-                            chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_RECEIVER_IMAGE));
-                            chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_RECEIVER_NAME));
-                            chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID));
+                            // If current user is sender, we need receiver's details
+                            userIdToFetch = receiverId;
+                            chatMessage.setConversionId(receiverId);
                         } else {
-                            chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_SENDER_IMAGE));
-                            chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_SENDER_NAME));
-                            chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_SENDER_ID));
+                            // If current user is receiver, we need sender's details
+                            userIdToFetch = senderId;
+                            chatMessage.setConversionId(senderId);
                         }
+                        
+                        // Fetch user details from users collection
+                        database.collection(Constants.KEY_COLLECTION_USERS)
+                                .document(userIdToFetch)
+                                .get()
+                                .addOnSuccessListener(userDocument -> {
+                                    if (userDocument.exists()) {
+                                        chatMessage.setConversionName(userDocument.getString(Constants.KEY_NAME));
+                                        chatMessage.setConversionImage(userDocument.getString(Constants.KEY_IMAGE));
+                                        
+                                        // Notify listener after user details are loaded
+                                        if (conversationListener != null) {
+                                            conversationListener.onConversationsUpdated();
+                                        }
+                                    }
+                                });
 
                         chatMessage.setMessage(documentChange.getDocument().getString(Constants.KEY_LAST_MESSAGE));
                         chatMessage.setDateObject(documentChange.getDocument().getDate(Constants.KEY_TIMESTAMP));
@@ -280,14 +294,32 @@ public class ConversationFirebaseService {
                             conversations.get(i).setDateObject(timestamp);
                             conversations.get(i).setLastSenderId(lastSenderId);
                             
-                            // Update sender and receiver image/name if needed
-                            if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
-                                conversations.get(i).setConversionImage(documentChange.getDocument().getString(Constants.KEY_RECEIVER_IMAGE));
-                                conversations.get(i).setConversionName(documentChange.getDocument().getString(Constants.KEY_RECEIVER_NAME));
+                            // Refetch user details if needed - this ensures profile changes are reflected
+                            String userIdToFetch;
+                            if (preferenceManager.getString(Constants.KEY_USER_ID).equals(conversations.get(i).getSenderId())) {
+                                // If current user is sender, refresh receiver's details
+                                userIdToFetch = conversations.get(i).getReceiverId();
                             } else {
-                                conversations.get(i).setConversionImage(documentChange.getDocument().getString(Constants.KEY_SENDER_IMAGE));
-                                conversations.get(i).setConversionName(documentChange.getDocument().getString(Constants.KEY_SENDER_NAME));
+                                // If current user is receiver, refresh sender's details
+                                userIdToFetch = conversations.get(i).getSenderId();
                             }
+                            
+                            // Fetch fresh user details from users collection
+                            final int conversationIndex = i;
+                            database.collection(Constants.KEY_COLLECTION_USERS)
+                                    .document(userIdToFetch)
+                                    .get()
+                                    .addOnSuccessListener(userDocument -> {
+                                        if (userDocument.exists() && conversationIndex < conversations.size()) {
+                                            conversations.get(conversationIndex).setConversionName(userDocument.getString(Constants.KEY_NAME));
+                                            conversations.get(conversationIndex).setConversionImage(userDocument.getString(Constants.KEY_IMAGE));
+                                            
+                                            // Notify listener after user details are updated
+                                            if (conversationListener != null) {
+                                                conversationListener.onConversationsUpdated();
+                                            }
+                                        }
+                                    });
                             
                             // Check if current user is in chat with the sender
                             String currentChatUserId = preferenceManager.getString("current_chat_user_id");
@@ -322,15 +354,31 @@ public class ConversationFirebaseService {
                         chatMessage.setDateObject(timestamp);
                         chatMessage.setLastSenderId(lastSenderId);
                         
+                        // Determine which user's details we need to fetch
+                        String userIdToFetch;
                         if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
-                            chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_RECEIVER_IMAGE));
-                            chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_RECEIVER_NAME));
-                            chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_RECEIVER_ID));
+                            userIdToFetch = receiverId;
+                            chatMessage.setConversionId(receiverId);
                         } else {
-                            chatMessage.setConversionImage(documentChange.getDocument().getString(Constants.KEY_SENDER_IMAGE));
-                            chatMessage.setConversionName(documentChange.getDocument().getString(Constants.KEY_SENDER_NAME));
-                            chatMessage.setConversionId(documentChange.getDocument().getString(Constants.KEY_SENDER_ID));
+                            userIdToFetch = senderId;
+                            chatMessage.setConversionId(senderId);
                         }
+                        
+                        // Fetch user details from users collection
+                        database.collection(Constants.KEY_COLLECTION_USERS)
+                                .document(userIdToFetch)
+                                .get()
+                                .addOnSuccessListener(userDocument -> {
+                                    if (userDocument.exists()) {
+                                        chatMessage.setConversionName(userDocument.getString(Constants.KEY_NAME));
+                                        chatMessage.setConversionImage(userDocument.getString(Constants.KEY_IMAGE));
+                                        
+                                        // Notify listener after user details are loaded
+                                        if (conversationListener != null) {
+                                            conversationListener.onConversationsUpdated();
+                                        }
+                                    }
+                                });
                         
                         if (documentChange.getDocument().getLong("unreadCount") != null) {
                             chatMessage.setUnreadCount(documentChange.getDocument().getLong("unreadCount").intValue());
@@ -468,16 +516,34 @@ public class ConversationFirebaseService {
                 ChatMessage chatMessage = new ChatMessage();
                 chatMessage.setSenderId(senderId);
                 chatMessage.setReceiverId(receiverId);
-
+                
+                // Determine which user's details we need to fetch (sender or receiver)
+                String userIdToFetch;
                 if (preferenceManager.getString(Constants.KEY_USER_ID).equals(senderId)) {
-                    chatMessage.setConversionImage(document.getString(Constants.KEY_RECEIVER_IMAGE));
-                    chatMessage.setConversionName(document.getString(Constants.KEY_RECEIVER_NAME));
-                    chatMessage.setConversionId(document.getString(Constants.KEY_RECEIVER_ID));
+                    // If current user is sender, we need receiver's details
+                    userIdToFetch = receiverId;
+                    chatMessage.setConversionId(receiverId);
                 } else {
-                    chatMessage.setConversionImage(document.getString(Constants.KEY_SENDER_IMAGE));
-                    chatMessage.setConversionName(document.getString(Constants.KEY_SENDER_NAME));
-                    chatMessage.setConversionId(document.getString(Constants.KEY_SENDER_ID));
+                    // If current user is receiver, we need sender's details
+                    userIdToFetch = senderId;
+                    chatMessage.setConversionId(senderId);
                 }
+                
+                // Fetch user details from users collection
+                database.collection(Constants.KEY_COLLECTION_USERS)
+                        .document(userIdToFetch)
+                        .get()
+                        .addOnSuccessListener(userDocument -> {
+                            if (userDocument.exists()) {
+                                chatMessage.setConversionName(userDocument.getString(Constants.KEY_NAME));
+                                chatMessage.setConversionImage(userDocument.getString(Constants.KEY_IMAGE));
+                                
+                                // Notify listener after user details are loaded
+                                if (conversationListener != null) {
+                                    conversationListener.onConversationsUpdated();
+                                }
+                            }
+                        });
 
                 chatMessage.setMessage(document.getString(Constants.KEY_LAST_MESSAGE));
                 chatMessage.setDateObject(document.getDate(Constants.KEY_TIMESTAMP));

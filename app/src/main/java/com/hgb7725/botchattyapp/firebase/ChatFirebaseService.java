@@ -55,15 +55,11 @@ public class ChatFirebaseService {
         database.collection(Constants.KEY_COLLECTION_CHAT).add(messageData);
 
         if(getConversionId() != null) {
-            conversationService.updateConversion(receiverId, receiverName, receiverImage, message);
+            conversationService.updateConversion(receiverId, message);
         } else {
             HashMap<String, Object> conversion = new HashMap<>();
             conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
-            conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
-            conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
             conversion.put(Constants.KEY_RECEIVER_ID, receiverId);
-            conversion.put(Constants.KEY_RECEIVER_NAME, receiverName);
-            conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverImage);
             conversion.put(Constants.KEY_LAST_MESSAGE, message);
             conversion.put(Constants.KEY_TIMESTAMP, new Date());
             conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
@@ -89,15 +85,11 @@ public class ChatFirebaseService {
         database.collection(Constants.KEY_COLLECTION_CHAT).add(message);
 
         if (getConversionId() != null) {
-            conversationService.updateConversion(receiverId, receiverName, receiverImage, "File: " + fileName);
+            conversationService.updateConversion(receiverId, "File: " + fileName);
         } else {
             HashMap<String, Object> conversion = new HashMap<>();
             conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
-            conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
-            conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
             conversion.put(Constants.KEY_RECEIVER_ID, receiverId);
-            conversion.put(Constants.KEY_RECEIVER_NAME, receiverName);
-            conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverImage);
             conversion.put(Constants.KEY_LAST_MESSAGE, "File: " + fileName);
             conversion.put(Constants.KEY_TIMESTAMP, new Date());
             conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
@@ -123,11 +115,7 @@ public class ChatFirebaseService {
             .addOnSuccessListener(documentReference -> {
                 HashMap<String, Object> conversion = new HashMap<>();
                 conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
-                conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
-                conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
                 conversion.put(Constants.KEY_RECEIVER_ID, receiverId);
-                conversion.put(Constants.KEY_RECEIVER_NAME, receiverName);
-                conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverImage);
                 conversion.put(Constants.KEY_LAST_MESSAGE, "Image");
                 conversion.put(Constants.KEY_TIMESTAMP, new Date());
                 conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));
@@ -156,11 +144,7 @@ public class ChatFirebaseService {
             .addOnSuccessListener(documentReference -> {
                 HashMap<String, Object> conversion = new HashMap<>();
                 conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
-                conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
-                conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
                 conversion.put(Constants.KEY_RECEIVER_ID, receiverId);
-                conversion.put(Constants.KEY_RECEIVER_NAME, receiverName);
-                conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverImage);
                 conversion.put(Constants.KEY_LAST_MESSAGE, "Video");
                 conversion.put(Constants.KEY_TIMESTAMP, new Date());
                 conversion.put("lastSenderId", preferenceManager.getString(Constants.KEY_USER_ID));

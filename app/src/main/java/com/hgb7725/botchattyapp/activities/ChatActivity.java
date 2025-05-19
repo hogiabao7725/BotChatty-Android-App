@@ -16,6 +16,7 @@ import com.hgb7725.botchattyapp.adapters.ChatAdapter;
 import com.hgb7725.botchattyapp.cloudinary.CloudinaryService;
 import com.hgb7725.botchattyapp.databinding.ActivityChatBinding;
 import com.hgb7725.botchattyapp.firebase.ChatFirebaseService;
+import com.hgb7725.botchattyapp.firebase.UserRelationshipService;
 import com.hgb7725.botchattyapp.models.ChatMessage;
 import com.hgb7725.botchattyapp.models.User;
 import com.hgb7725.botchattyapp.utilities.BlockStatusChecker;
@@ -45,30 +46,31 @@ public class ChatActivity extends BaseActivity {
     private static final int PICK_FILE_REQUEST = 2;
     private static final int RECORD_AUDIO_REQUEST = 3;
     private static final int PICK_VIDEO_REQUEST = 4;
+    private UserRelationshipService userRelationshipService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityChatBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        setListeners();
+        // Initialize services first
+        preferenceManager = new PreferenceManager(getApplicationContext());
+        chatFirebaseService = new ChatFirebaseService(preferenceManager);
+        cloudinaryService = new CloudinaryService(this);
+        blockStatusChecker = new BlockStatusChecker(this, preferenceManager);
+        userRelationshipService = new UserRelationshipService(this, preferenceManager);
+        // Now load receiver details (which sets receiverUser)
         loadReceiverDetails();
+        setListeners();
         init();
         setupListeners();
         checkBlockStatus();
-
         // Mark current conversation as read
         chatFirebaseService.markConversationAsRead(receiverUser.getId());
     }
 
     private void init() {
-        preferenceManager = new PreferenceManager(getApplicationContext());
         chatMessages = new ArrayList<>();
-
-        // Initialize services
-        chatFirebaseService = new ChatFirebaseService(preferenceManager);
-        cloudinaryService = new CloudinaryService(this);
-        blockStatusChecker = new BlockStatusChecker(this, preferenceManager);
 
         chatAdapter = new ChatAdapter(
                 chatMessages,
@@ -221,13 +223,31 @@ public class ChatActivity extends BaseActivity {
     }
 
     private Bitmap getBitmapFromEncodedString(String encodedImage) {
+        if (encodedImage == null || encodedImage.isEmpty()) {
+            // Return a default avatar if image is missing
+            return BitmapFactory.decodeResource(getResources(), R.drawable.default_avatar); // Ensure you have a default_avatar in drawable
+        }
         byte[] bytes = Base64.decode(encodedImage, Base64.DEFAULT);
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
     }
 
     private void loadReceiverDetails() {
         receiverUser = (User) getIntent().getSerializableExtra(Constants.KEY_USER);
+        // Default to real name
         binding.textName.setText(receiverUser.getName());
+        // Fetch nickname and update if exists
+        userRelationshipService.getNickname(receiverUser.getId(), new UserRelationshipService.NicknameListener() {
+            @Override
+            public void onNicknameLoaded(String nickname) {
+                if (nickname != null && !nickname.isEmpty()) {
+                    binding.textName.setText(nickname);
+                }
+            }
+            @Override
+            public void onFailure(String errorMessage) {
+                // Do nothing, fallback to real name
+            }
+        });
     }
 
     private void setListeners() {

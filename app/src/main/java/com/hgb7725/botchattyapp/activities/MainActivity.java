@@ -12,6 +12,7 @@ import com.hgb7725.botchattyapp.adapters.RencentConversationsAdapter;
 import com.hgb7725.botchattyapp.databinding.ActivityMainBinding;
 import com.hgb7725.botchattyapp.firebase.ConversationFirebaseService;
 import com.hgb7725.botchattyapp.firebase.UserFirebaseService;
+import com.hgb7725.botchattyapp.firebase.UserRelationshipService;
 import com.hgb7725.botchattyapp.listeners.ConversionListener;
 import com.hgb7725.botchattyapp.models.ChatMessage;
 import com.hgb7725.botchattyapp.models.User;
@@ -31,6 +32,7 @@ public class MainActivity extends BaseActivity implements ConversionListener {
     private RencentConversationsAdapter conversationsAdapter;
     private ConversationFirebaseService conversationService;
     private UserFirebaseService userService;
+    private UserRelationshipService userRelationshipService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +46,7 @@ public class MainActivity extends BaseActivity implements ConversionListener {
         // Initialize Firebase services
         conversationService = new ConversationFirebaseService(getApplicationContext(), preferenceManager);
         userService = new UserFirebaseService(getApplicationContext(), preferenceManager);
+        userRelationshipService = new UserRelationshipService(this, preferenceManager);
         
         init();
         loadUserDetails();
@@ -150,6 +153,25 @@ public class MainActivity extends BaseActivity implements ConversionListener {
                 // Update the adapter with new data
                 conversations.clear();
                 conversations.addAll(conversationList);
+                
+                // Fetch nicknames for each conversation
+                for (ChatMessage chatMessage : conversationList) {
+                    String otherUserId = chatMessage.getConversionId();
+                    userRelationshipService.getNickname(otherUserId, new UserRelationshipService.NicknameListener() {
+                        @Override
+                        public void onNicknameLoaded(String nickname) {
+                            if (nickname != null && !nickname.isEmpty()) {
+                                chatMessage.setConversionName(nickname);
+                                conversationsAdapter.notifyDataSetChanged();
+                            }
+                        }
+                        @Override
+                        public void onFailure(String errorMessage) {
+                            // Do nothing, fallback to real name
+                        }
+                    });
+                }
+                
                 conversationsAdapter.notifyDataSetChanged();
                 binding.conversationsRecyclerView.setVisibility(View.VISIBLE);
                 binding.progressBar.setVisibility(View.GONE);

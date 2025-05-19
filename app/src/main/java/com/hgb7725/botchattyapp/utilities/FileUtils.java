@@ -181,18 +181,7 @@ public class FileUtils {
             public void onReceive(Context ctx, Intent intent) {
                 long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
                 if (id == downloadId) {
-                    File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName);
-                    Uri fileUri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".provider", file);
-
-                    Intent openIntent = new Intent(Intent.ACTION_VIEW);
-                    openIntent.setDataAndType(fileUri, getMimeType(fileName));
-                    openIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
-                    try {
-                        ctx.startActivity(openIntent);
-                    } catch (Exception e) {
-                        Toast.makeText(ctx, "No app to open this file", Toast.LENGTH_SHORT).show();
-                    }
-
+                    Toast.makeText(ctx, "Download completed", Toast.LENGTH_SHORT).show();
                     ctx.unregisterReceiver(this); // cleanup
                 }
             }

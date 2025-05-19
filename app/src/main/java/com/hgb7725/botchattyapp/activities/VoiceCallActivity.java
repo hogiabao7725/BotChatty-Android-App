@@ -44,7 +44,6 @@ public class VoiceCallActivity extends BaseActivity {
     private Handler durationHandler;
     private Runnable durationRunnable;
     
-    // Agora App ID - Replace with your own App ID from Agora Console
     private static final String AGORA_APP_ID = "8271e3645db7490ab53b74ddf137d3e9";
     
     // Permission request

@@ -38,4 +38,6 @@ public class Constants {
     public static final String KEY_MUTED = "muted";      // Changed from KEY_IS_MUTED to KEY_MUTED
     public static final String KEY_NICKNAME = "nickname"; // Added for the nickname feature
     public static final String KEY_LAST_UPDATED = "lastUpdated";
+
+    public static final String KEY_COLLECTION_CALLS = "calls";
 }

@@ -16,6 +16,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
+import com.hgb7725.botchattyapp.services.CallManager;
 
 /**
  * Custom Application class to monitor app lifecycle and handle online status updates
@@ -37,6 +38,8 @@ public class BotChattyApplication extends Application implements LifecycleObserv
         
         // Initialize preference manager
         preferenceManager = new PreferenceManager(getApplicationContext());
+        // Initialize global CallManager
+        CallManager.init(this);
     }
 
     /**

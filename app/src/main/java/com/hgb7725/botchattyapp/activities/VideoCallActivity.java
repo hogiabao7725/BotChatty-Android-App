@@ -17,6 +17,7 @@ import androidx.core.content.ContextCompat;
 import com.hgb7725.botchattyapp.R;
 import com.hgb7725.botchattyapp.databinding.ActivityVideoCallBinding;
 import com.hgb7725.botchattyapp.models.User;
+import com.hgb7725.botchattyapp.services.CallService;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
 
@@ -43,6 +44,7 @@ public class VideoCallActivity extends BaseActivity {
     private long callStartTime;
     private Handler durationHandler;
     private Runnable durationRunnable;
+    private String callId;
     
     // Agora App ID - Replace with your own App ID from Agora Console
     private static final String AGORA_APP_ID = "8271e3645db7490ab53b74ddf137d3e9";
@@ -107,6 +109,7 @@ public class VideoCallActivity extends BaseActivity {
         
         // Get receiver user data from intent
         receiverUser = (User) getIntent().getSerializableExtra(Constants.KEY_USER);
+        callId = getIntent().getStringExtra("callId");
         
         // Set up UI
         binding.textName.setText(receiverUser.getName());
@@ -115,6 +118,7 @@ public class VideoCallActivity extends BaseActivity {
         if (checkPermissions()) {
             initializeAndJoinChannel();
         }
+        listenForCallStatus();
     }
     
     private boolean checkPermissions() {
@@ -304,7 +308,11 @@ public class VideoCallActivity extends BaseActivity {
         if (agoraEngine != null) {
             agoraEngine.leaveChannel();
         }
-        
+        // Update Firestore status to 'ended'
+        if (callId != null) {
+            com.hgb7725.botchattyapp.services.CallService callService = new com.hgb7725.botchattyapp.services.CallService(getApplicationContext());
+            callService.endCall(callId);
+        }
         // Return to previous screen after a short delay
         binding.getRoot().postDelayed(() -> {
             finish();
@@ -358,5 +366,17 @@ public class VideoCallActivity extends BaseActivity {
         if (durationHandler != null && durationRunnable != null) {
             durationHandler.removeCallbacks(durationRunnable);
         }
+    }
+
+    private void listenForCallStatus() {
+        if (callId == null) return;
+        CallService.listenForCallStatus(this, callId, status -> {
+            if ("rejected".equals(status) || "ended".equals(status)) {
+                runOnUiThread(() -> {
+                    Toast.makeText(this, "Call ended or rejected", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
+            }
+        });
     }
 }

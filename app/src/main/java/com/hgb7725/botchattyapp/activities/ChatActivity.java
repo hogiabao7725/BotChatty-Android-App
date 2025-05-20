@@ -19,6 +19,8 @@ import com.hgb7725.botchattyapp.firebase.ChatFirebaseService;
 import com.hgb7725.botchattyapp.firebase.UserRelationshipService;
 import com.hgb7725.botchattyapp.models.ChatMessage;
 import com.hgb7725.botchattyapp.models.User;
+import com.hgb7725.botchattyapp.services.CallService;
+import com.hgb7725.botchattyapp.dialogs.IncomingCallDialog;
 import com.hgb7725.botchattyapp.utilities.BlockStatusChecker;
 import com.hgb7725.botchattyapp.utilities.Constants;
 import com.hgb7725.botchattyapp.utilities.PreferenceManager;
@@ -47,6 +49,10 @@ public class ChatActivity extends BaseActivity {
     private static final int RECORD_AUDIO_REQUEST = 3;
     private static final int PICK_VIDEO_REQUEST = 4;
     private UserRelationshipService userRelationshipService;
+    private CallService callService;
+    private IncomingCallDialog incomingCallDialog;
+    private String currentOutgoingCallId = null;
+    private boolean isWaitingForCallResponse = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,12 +65,14 @@ public class ChatActivity extends BaseActivity {
         cloudinaryService = new CloudinaryService(this);
         blockStatusChecker = new BlockStatusChecker(this, preferenceManager);
         userRelationshipService = new UserRelationshipService(this, preferenceManager);
+        callService = new CallService(this);
         // Now load receiver details (which sets receiverUser)
         loadReceiverDetails();
         setListeners();
         init();
         setupListeners();
         checkBlockStatus();
+        setupCallListeners();
         // Mark current conversation as read
         chatFirebaseService.markConversationAsRead(receiverUser.getId());
     }
@@ -197,6 +205,71 @@ public class ChatActivity extends BaseActivity {
         });
     }
 
+    private void setupCallListeners() {
+        callService.setCallListener(new CallService.OnCallListener() {
+            @Override
+            public void onIncomingCall(String callId, User caller, boolean isVideoCall) {
+                runOnUiThread(() -> {
+                    if (incomingCallDialog != null && incomingCallDialog.isShowing()) {
+                        incomingCallDialog.dismiss();
+                    }
+                    incomingCallDialog = new IncomingCallDialog(ChatActivity.this, caller, isVideoCall, new IncomingCallDialog.OnCallActionListener() {
+                        @Override
+                        public void onAcceptCall(String dialogCallId) {
+                            callService.acceptCall(dialogCallId);
+                            // Start call activity for B
+                            Intent intent = new Intent(getApplicationContext(), isVideoCall ? VideoCallActivity.class : VoiceCallActivity.class);
+                            intent.putExtra("callId", dialogCallId);
+                            intent.putExtra(Constants.KEY_USER, caller);
+                            startActivity(intent);
+                        }
+                        @Override
+                        public void onRejectCall(String dialogCallId) {
+                            callService.rejectCall(dialogCallId);
+                        }
+                    });
+                    incomingCallDialog.setCallId(callId);
+                    incomingCallDialog.show();
+                });
+            }
+            @Override
+            public void onCallAccepted(String callId) {
+                // Only handle if this device is the caller and waiting
+                if (isWaitingForCallResponse && callId.equals(currentOutgoingCallId)) {
+                    runOnUiThread(() -> {
+                        // Already in call activity, do nothing or show connected UI
+                    });
+                }
+            }
+            @Override
+            public void onCallRejected(String callId) {
+                // Only handle if this device is the caller and waiting
+                if (isWaitingForCallResponse && callId.equals(currentOutgoingCallId)) {
+                    runOnUiThread(() -> {
+                        Toast.makeText(ChatActivity.this, "Call was rejected", Toast.LENGTH_SHORT).show();
+                        resetCallState();
+                    });
+                }
+            }
+            @Override
+            public void onCallEnded(String callId) {
+                runOnUiThread(() -> {
+                    if (callId.equals(currentOutgoingCallId)) {
+                        resetCallState();
+                    }
+                });
+            }
+        });
+    }
+
+    private void resetCallState() {
+        isWaitingForCallResponse = false;
+        currentOutgoingCallId = null;
+        // Re-enable call buttons
+        binding.imageCall.setEnabled(true);
+        binding.imageVideoCall.setEnabled(true);
+    }
+
     private void sendMessage() {
         String message = binding.inputMessage.getText().toString().trim();
         if (!message.isEmpty()) {
@@ -251,8 +324,19 @@ public class ChatActivity extends BaseActivity {
     }
 
     private void setListeners() {
-        binding.imageBack.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
+        binding.imageBack.setOnClickListener(v -> onBackPressed());
         binding.layoutSend.setOnClickListener(v -> sendMessage());
+        binding.imageCall.setOnClickListener(v -> {
+            if (!isWaitingForCallResponse) {
+                initiateCall(false);
+            }
+        });
+        binding.imageVideoCall.setOnClickListener(v -> {
+            if (!isWaitingForCallResponse) {
+                initiateCall(true);
+            }
+        });
+        binding.imageAttachment.setOnClickListener(v -> toggleAttachmentOptions());
 
         // Add info icon click listener to open user profile - passing only the user ID
         binding.imageInfo.setOnClickListener(v -> {
@@ -260,24 +344,6 @@ public class ChatActivity extends BaseActivity {
             intent.putExtra(Constants.KEY_USER_ID, receiverUser.getId());
             startActivity(intent);
         });
-
-        // Add call button click listeners
-        binding.imageCall.setOnClickListener(v -> {
-            // Start voice call
-            Intent intent = new Intent(getApplicationContext(), VoiceCallActivity.class);
-            intent.putExtra(Constants.KEY_USER, receiverUser);
-            startActivity(intent);
-        });
-
-        binding.imageVideoCall.setOnClickListener(v -> {
-            // Start video call
-            Intent intent = new Intent(getApplicationContext(), VideoCallActivity.class);
-            intent.putExtra(Constants.KEY_USER, receiverUser);
-            startActivity(intent);
-        });
-
-        // Add attachment button click listener
-        binding.imageAttachment.setOnClickListener(v -> toggleAttachmentOptions());
 
         // Add attachment options click listeners
         binding.layoutAttachmentOptions.layoutImage.setOnClickListener(v -> {
@@ -312,6 +378,32 @@ public class ChatActivity extends BaseActivity {
         } else {
             binding.layoutAttachmentOptions.getRoot().setVisibility(View.VISIBLE);
         }
+    }
+
+    private void initiateCall(boolean isVideoCall) {
+        if (isWaitingForCallResponse) return;
+        
+        isWaitingForCallResponse = true;
+        binding.imageCall.setEnabled(false);
+        binding.imageVideoCall.setEnabled(false);
+        
+        callService.initiateCall(receiverUser.getId(), isVideoCall, new CallService.OnCallInitiatedListener() {
+            @Override
+            public void onCallInitiated(String callId, boolean isVideoCall) {
+                if (callId != null) {
+                    currentOutgoingCallId = callId;
+                    Intent intent = new Intent(getApplicationContext(), isVideoCall ? VideoCallActivity.class : VoiceCallActivity.class);
+                    intent.putExtra("callId", callId);
+                    intent.putExtra(Constants.KEY_USER, receiverUser);
+                    startActivity(intent);
+                } else {
+                    runOnUiThread(() -> {
+                        Toast.makeText(ChatActivity.this, "Cannot initiate call at this time", Toast.LENGTH_SHORT).show();
+                        resetCallState();
+                    });
+                }
+            }
+        });
     }
 
     // Processes the selected media (file, image, and video) based on the request code.
@@ -468,5 +560,13 @@ public class ChatActivity extends BaseActivity {
         super.onPause();
         // When leaving chat screen, remove receiver id from preferences
         preferenceManager.putString("current_chat_user_id", null);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (incomingCallDialog != null && incomingCallDialog.isShowing()) {
+            incomingCallDialog.dismiss();
+        }
     }
 }
